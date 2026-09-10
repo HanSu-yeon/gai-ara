@@ -10,9 +10,37 @@ const jalnan = localFont({
   adjustFontFallback: false,
 });
 
+const SITE_URL = "https://gai-ara-rouge.vercel.app";
+const SHARE_TITLE = "가이 알아? 우리, 생각보다 가까울지도 🍊";
+const SHARE_DESCRIPTION = "나랑 얼마나 가까운 사이인지 확인해봐요.";
+
 export const metadata: Metadata = {
-  title: "가이 알아? — 제주에서 몇 다리?",
-  description: "제주에서 우리는 몇 다리 건너 연결되어 있을까?",
+  // TODO: 커스텀 도메인을 연결하면 이 값을 그 도메인으로 바꾼다.
+  metadataBase: new URL(SITE_URL),
+  title: SHARE_TITLE,
+  description: SHARE_DESCRIPTION,
+  openGraph: {
+    title: SHARE_TITLE,
+    description: SHARE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: "가이 알아?",
+    locale: "ko_KR",
+    type: "website",
+    images: [
+      {
+        url: "/assets/gamgyul-wave.png",
+        width: 1234,
+        height: 1274,
+        alt: "인사하는 감귤 캐릭터",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SHARE_TITLE,
+    description: SHARE_DESCRIPTION,
+    images: ["/assets/gamgyul-wave.png"],
+  },
 };
 
 export const viewport: Viewport = {
