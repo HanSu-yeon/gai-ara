@@ -1,0 +1,4 @@
+interface:
+  display_name: "Documentation Rules"
+  short_description: "Apply docs, links, and HTML preview rules"
+  default_prompt: "Use $rules-docs to decide where docs, HTML previews, and related links belong."

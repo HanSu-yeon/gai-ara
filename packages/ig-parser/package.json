@@ -1,0 +1,20 @@
+{
+  "name": "@gai-ara/ig-parser",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "echo 'no-op'"
+  },
+  "dependencies": {
+    "jszip": "^3.10.2"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

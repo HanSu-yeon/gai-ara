@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gaiara
+      POSTGRES_PASSWORD: gaiara
+      POSTGRES_DB: gaiara
+    ports:
+      - "5432:5432"
+    volumes:
+      - gaiara_pg_data:/var/lib/postgresql/data
+
+volumes:
+  gaiara_pg_data:

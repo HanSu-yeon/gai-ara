@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gai-ara-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@gai-ara/web", "dev"],
+      "port": 3000
+    }
+  ]
+}

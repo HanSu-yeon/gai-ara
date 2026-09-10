@@ -1,0 +1,456 @@
+---
+name: rules-product
+description: Orchestrates the full product development pipeline from planning to development docs. Diagnoses current project phase, checks UI, component, Context Receipt, and verification gates, and delegates to the correct sub-skill at each step. Use this as the entry point for new projects or when resuming work mid-flow.
+---
+
+# Product Workflow Orchestrator
+
+> **Human Quick Reference**
+> - **When**: New project, resume work, or "what should I do next?"
+> - **Invoke**: `/rules-product` or ask for a Flow Status Block diagnosis
+> - **Prerequisites**: None — starts by scanning the repo
+> - **Next**: `docs-plan`, `docs-dev`, `rules-react`, `rules-workflow`, or `verify-implementation` by phase
+> - **Guide**: project root `USAGE.md` (English default, Korean below; copied on install)
+
+You are a **workflow lead** who guides the user through the full product development pipeline. Diagnose the current phase, verify gate conditions, and invoke the required sub-skill or internal check yourself. Do not make users run harness CLI commands or translate an internal gate into a manual task.
+
+## Pipeline Overview
+
+```
+Phase 1: 기획문서       → docs-plan (Concept_Design)
+Phase 2: UI 설계 문서   → docs-plan (UI_Screens)
+HTML UI Preview Gate: 브라우저 확인용 화면 제작·링크·피드백
+UI-First Gate: 화면·동선·데이터 흐름 확인
+Pre-Code Technical Brief: 데이터·API·상태 최소 합의
+Component & Library Planning Gate: 컴포넌트·라이브러리·shadcn 적용 계획
+Context Receipt Gate: 읽기 전용 에이전트의 관련 문서 확인
+Phase 3: React 변환     → rules-react
+Phase 4: 개발문서       → docs-dev
+Phase 5: 독립 품질 검증 → Verification Receipt + verify-implementation
+Phase 6: 최종 전달물    → docs-pitch / docs-business (선택)
+```
+
+---
+
+## Step 0: Diagnose Current Phase
+
+Before anything else, scan the project to determine where it stands.
+
+Run these checks in order:
+
+| Check | Signal | Meaning |
+|-------|--------|---------|
+| `docs/01_Concept_Design/` 존재 여부 | 없으면 Phase 1 미완 | 기획문서 필요 |
+| `docs/02_UI_Screens/` 존재 여부 | 없으면 Phase 2 미완 | UI 설계 필요 |
+| HTML UI Preview 확인 여부 | 없으면 Phase 3 진입 보류 | 브라우저 확인용 화면 필요 |
+| UI-First Gate 확인 여부 | 없으면 Phase 3 진입 보류 | 화면·동선·데이터 흐름 확인 필요 |
+| Pre-Code Technical Brief 여부 | 없으면 Phase 3 진입 보류 | 최소 기술 합의 필요 |
+| Component & Library Plan 여부 | 없으면 Phase 3 진입 보류 | 컴포넌트·라이브러리 선택 필요 |
+| Context Receipt 여부 | code/deploy 작업에서 없으면 구현 보류 | 관련 문서 확인 근거 필요 |
+| `src/components/` 또는 React 코드 존재 여부 | 없으면 Phase 3 미완 | React 개발 필요 |
+| `docs/03_Technical_Specs/` 존재 여부 | 없으면 Phase 4 미완 | 개발문서 필요 |
+| verify-* 스킬 실행 이력 또는 사용자 확인 여부 | 없으면 Phase 5 미완 | 품질 검증 필요 |
+
+진단 결과는 항상 아래 `Flow Status Block` 형식으로 보고한다. 새 작업 시작, Phase 전환, 구현 시작 전, 검증 시작 전, 최종 보고 시에도 같은 형식을 짧게 반복한다.
+
+```
+[Flow]
+현재: Phase N — [단계명]
+Gate: [진행 중 / 통과 / 미통과 / N/A]
+완료: [완료된 Phase 또는 없음]
+다음: [다음 Phase 또는 Gate]
+필요 확인: [막힌 조건 또는 확인할 항목]
+권장 스킬: /skill-name
+```
+
+일상적인 중간 답변에서는 한 줄 축약형을 쓸 수 있다:
+
+```
+현재 위치: Phase N — [단계명] / Gate: [상태] / 다음: [다음 액션]
+```
+
+사용자가 특정 단계를 명시한 경우 그 단계로 바로 이동한다.
+
+---
+
+## Phase 1: 기획문서 (Concept_Design)
+
+**목표**: 제품 비전, 문제 정의, 타겟 유저, 비즈니스 모델을 문서화한다.
+
+**Gate In**: 프로젝트 아이디어 또는 문제의식이 있는 상태
+
+**Gate Out** (다음 단계 진입 조건):
+- [ ] `docs/01_Concept_Design/01_VISION_CORE.md` 존재
+- [ ] `docs/01_Concept_Design/02_LEAN_CANVAS.md` 존재
+- [ ] `docs/01_Concept_Design/03_PRODUCT_SPECS.md` 존재
+
+**위임 지시**:
+
+```
+사용할 스킬: docs-plan
+작업 범위: Layer 1 (Concept_Design)
+필수 질문 선행: docs-plan의 Phase 1 질문 (Why / Who / What / How / Distribution / Layout&Brand)
+```
+
+Phase 1 완료 확인 후 다음을 묻는다:
+> "Phase 1 문서가 완성되었습니다. Phase 2(UI 설계 문서)로 넘어갈까요? 또는 기획문서를 바탕으로 파생 문서(피치덱, 사업계획서)를 먼저 작성할 수도 있습니다."
+
+Phase 1 완료 보고에는 `Flow Status Block`을 포함한다.
+
+---
+
+### Phase 1 파생 문서 (선택, 순서 무관)
+
+Phase 1이 완료된 후 언제든 작성 가능하다. Phase 2 진입과 독립적으로 진행할 수 있다.
+
+#### 파생 A: 피치덱
+
+**목적**: 투자자, 해커톤, 데모데이를 위한 발표 자료
+
+**Gate In**: Phase 1 문서 3종 존재 (VISION_CORE, LEAN_CANVAS, PRODUCT_SPECS)
+
+**위임 지시**:
+```
+사용할 스킬: docs-pitch
+출력 모드 선택: Markdown / Reveal.js HTML
+참조 문서: docs/01_Concept_Design/ 전체
+```
+
+#### 파생 B: 사업계획서
+
+**목적**: 정부 지원, 투자 심사, 파트너십을 위한 정식 사업 설명 문서
+
+**Gate In**: Phase 1 문서 3종 존재 (VISION_CORE, LEAN_CANVAS, PRODUCT_SPECS)
+
+**위임 지시**:
+```
+사용할 스킬: docs-business
+저장 경로: docs/01_Concept_Design/XX_BUSINESS_PLAN.md
+참조 문서: docs/01_Concept_Design/ 전체
+```
+
+---
+
+## Phase 2: UI 설계 문서 (UI_Screens)
+
+**목표**: 전체 화면 흐름, UI 디자인 원칙, 페이지별 구조를 문서로 정의한다.
+
+**Gate In**:
+- Phase 1 문서 (`01_Concept_Design/`) 존재
+
+**Gate Out** (다음 단계 진입 조건):
+- [ ] `docs/02_UI_Screens/00_SCREEN_FLOW.md` 존재
+- [ ] `docs/02_UI_Screens/01_UI_DESIGN.md` 존재
+- [ ] 주요 화면 목록과 화면별 목적이 정의됨
+- [ ] 사용자 진입·이탈·전환 동선이 정의됨
+- [ ] 화면별 입력 데이터, 출력 데이터, 상태 변화가 정의됨
+- [ ] 로딩·빈 상태·오류 상태가 정의됨
+- [ ] `docs/02_UI_Screens/previews/`에 주요 화면 또는 사용자 흐름 HTML Preview가 존재함
+- [ ] UI 문서가 관련 HTML Preview를 상대 경로로 링크함
+- [ ] 사용자가 화면/UI를 먼저 확인했거나, 확인할 수 있는 프로토타입/스크린샷/리뷰 문서가 있음
+
+**위임 지시**:
+
+```
+사용할 스킬: docs-plan
+작업 범위: Layer 2 (UI_Screens)
+참조 문서: docs/01_Concept_Design/ 전체 읽기 후 시작
+```
+
+Phase 2 완료 후 곧바로 코딩하지 않는다. 먼저 HTML UI Preview Gate와 UI-First Gate를 확인하고 다음을 묻는다:
+> "HTML Preview로 화면 구조, 사용자 동선, 데이터 흐름, 로딩/빈/오류 상태를 먼저 확인했습니다. 현재 단계에서 더 구체화하거나 보완할 점이 있을까요?"
+
+Phase 2 완료 보고에는 `Flow Status Block`을 포함하고, 다음 위치가 `HTML UI Preview Gate` 또는 `UI-First Gate`임을 명시한다.
+
+---
+
+## HTML UI Preview Gate: 브라우저 확인용 화면 제작·링크·피드백
+
+**목표**: Markdown UI 문서만으로 소통하지 않고, 사용자가 브라우저에서 직접 볼 수 있는 HTML 화면으로 UI를 확인한다. 이 게이트를 통과하기 전에는 Phase 3 구현을 시작하지 않는다.
+
+**필수 확인 항목**:
+- [ ] 주요 화면 또는 핵심 사용자 흐름별 HTML Preview가 존재함
+- [ ] HTML Preview가 `docs/02_UI_Screens/previews/`에 저장됨
+- [ ] `00_SCREEN_FLOW.md`, `01_UI_DESIGN.md`, 관련 `XX_PROTOTYPE_REVIEW.md`가 HTML Preview를 상대 경로로 링크함
+- [ ] HTML Preview를 사용자에게 보여주고 피드백을 받음
+- [ ] 피드백과 보완 사항이 UI 문서 또는 백로그에 기록됨
+
+**Gate Out**:
+- [ ] HTML Preview 파일 경로가 문서에 링크됨
+- [ ] 사용자 확인 기록이 `XX_PROTOTYPE_REVIEW.md`, `00_SCREEN_FLOW.md`, `01_UI_DESIGN.md`, 또는 백로그에 남아 있음
+- [ ] 필요한 보완 사항이 반영되었거나 백로그에 태스크로 등록됨
+
+---
+
+## UI-First Gate: 화면·동선·데이터 흐름 확인
+
+**목표**: 구동 코드 작성 전에 실제 화면 기준으로 사용 흐름과 데이터 흐름을 합의한다. 이 게이트를 통과하기 전에는 Phase 3 구현을 시작하지 않는다.
+
+**필수 확인 항목**:
+- [ ] 주요 화면과 화면별 목적
+- [ ] 사용자 진입 경로, 다음 행동, 이탈 경로
+- [ ] 화면별 CTA와 인터랙션
+- [ ] 화면별 입력 데이터, 출력 데이터, 상태 변화
+- [ ] 로딩, 빈 상태, 오류 상태, 권한 없음 상태
+- [ ] 모바일·데스크톱에서 구조 차이가 큰 구간
+- [ ] HTML Preview가 실제 화면 커뮤니케이션 기준으로 확인됨
+- [ ] 사용자 또는 의사결정권자가 화면/UI를 먼저 확인한 기록
+
+**Gate Out**:
+- [ ] HTML UI Preview Gate 통과
+- [ ] `00_SCREEN_FLOW.md`에 사용자 여정과 전환 흐름이 기록됨
+- [ ] `01_UI_DESIGN.md` 또는 `XX_PROTOTYPE_REVIEW.md`에 화면 상태와 피드백이 기록됨
+- [ ] 필요한 경우 `docs/04_Logic_Progress/00_BACKLOG.md`의 작업 항목에 UI 확인 결과가 반영됨
+
+UI-First Gate 보고에는 `Flow Status Block`을 포함하고, 다음 위치가 `Pre-Code Technical Brief`임을 명시한다.
+
+---
+
+## Pre-Code Technical Brief: 데이터·API·상태 최소 합의
+
+**목표**: UI 확인 후 바로 코딩하지 않고, 구현에 필요한 최소 기술 계약을 먼저 정한다. 완전한 기술 명세가 아니어도 되지만, React 구현이 임의의 데이터 구조와 상태 흐름을 만들지 않도록 한다.
+
+**필수 확인 항목**:
+- [ ] 화면별 데이터 소스: mock data, API, DB, 외부 서비스 중 무엇인가?
+- [ ] 화면별 입력·출력 데이터의 최소 필드
+- [ ] 주요 mutation: 생성, 수정, 삭제, 제출, 업로드 등
+- [ ] 상태 관리 방식: local state, URL state, server state, global store 중 무엇인가?
+- [ ] API/DB가 필요한 경우 임시 계약 또는 문서 위치
+- [ ] Acceptance Criteria: 구현 완료를 판단할 사용자 시나리오
+
+**Gate Out**:
+- [ ] `docs/03_Technical_Specs/` 문서가 있으면 관련 계약이 반영됨
+- [ ] 기술 문서가 아직 없으면 백로그의 `Implementation Preconditions` 또는 `Acceptance Criteria`에 최소 계약이 기록됨
+- [ ] 구현자가 mock data 구조와 실제 데이터 전환 방식을 설명할 수 있음
+
+Pre-Code Technical Brief 보고에는 `Flow Status Block`을 포함하고, 다음 위치가 `Component & Library Planning Gate`임을 명시한다.
+
+---
+
+## Component & Library Planning Gate: 컴포넌트·라이브러리 적용 계획
+
+**목표**: React 구현 전에 사용할 컴포넌트와 라이브러리를 정리해, UI 구현자가 임의로 패키지를 설치하거나 중복 컴포넌트를 만들지 않도록 한다. 이 게이트를 통과하기 전에는 Phase 3 구현을 시작하지 않는다.
+
+**필수 확인 항목**:
+- [ ] 화면별 사용할 shadcn/ui 컴포넌트 목록
+- [ ] 직접 만들 커스텀 컴포넌트와 재사용할 기존 컴포넌트 목록
+- [ ] 새로 설치할 라이브러리와 설치하지 않을 라이브러리의 이유
+- [ ] 상태 관리, 폼, 검증, toast, table, date/time 등 UI 주변 라이브러리 선택
+- [ ] shadcn 초기화 상태: 신규 프로젝트는 `init --preset`, 기존 프로젝트는 `apply --preset` 또는 `--only theme` 적용 여부
+- [ ] 새 의존성이 `rules-dev`의 Minimal Implementation Gate를 통과하는 이유
+
+**Gate Out**:
+- [ ] `docs/03_Technical_Specs/` 문서, 백로그 항목, 또는 Pre-Code Technical Brief에 Component & Library Plan이 기록됨
+- [ ] `tools-shadcn`이 필요한 경우 적용 명령과 대상 범위가 기록됨
+- [ ] 구현자가 새 컴포넌트·새 라이브러리·shadcn preset 적용 여부를 설명할 수 있음
+
+**위임 지시**:
+
+```
+사용할 스킬: tools-shadcn + rules-react
+입력: docs/02_UI_Screens/ 화면 설계, Pre-Code Technical Brief, 기존 components.json 및 package.json
+출력: Component & Library Plan
+```
+
+Component & Library Planning Gate 보고에는 `Flow Status Block`을 포함하고, 다음 위치가 `Context Receipt Gate`임을 명시한다.
+
+---
+
+## Context Receipt Gate: 관련 문서 확인
+
+**목표**: `code`와 `deploy` 작업 전에 읽기 전용 Context Agent가 백로그의 모든 Related 문서를 실제로 읽었음을 증명한다.
+
+**Gate Out**:
+- [ ] 백로그에 `Work Type`이 기록됨
+- [ ] Context Receipt의 상태가 PASS이거나 warning 발견 사항에 사용자 진행 승인이 있음
+- [ ] `Required References Read`가 모든 실제 Related 링크를 포함함
+- [ ] Constraints와 Conflicts가 기록됨
+- [ ] Coordinator가 warning 기간의 preflight 발견 사항을 기록하고 사용자 진행 승인을 받음. blocking 전환 후에는 Coordinator가 내부 `preflight TASK-ID --strict`를 통과시킴
+
+상세 역할과 Receipt 형식은 `rules-workflow/resources/agent-harness-contract.md`를 정본으로 따른다. `docs`와 `prototype` 작업은 이 게이트를 기록성 체크로 적용한다.
+
+Context Receipt Gate 보고에는 `Flow Status Block`을 포함하고, 다음 위치가 `Phase 3 — React 변환`임을 명시한다.
+
+---
+
+## Phase 3: React + Tailwind 개발
+
+**목표**: UI 설계 문서를 기반으로 실제 React 컴포넌트와 페이지를 구현한다.
+
+**Gate In**:
+- Phase 2 문서 (`02_UI_Screens/`) 존재
+- HTML UI Preview Gate 통과
+- UI-First Gate 통과
+- 화면·동선·데이터 흐름 확인 결과가 백로그 또는 UI 문서에 반영됨
+- Pre-Code Technical Brief 통과
+- Component & Library Planning Gate 통과
+- code/deploy 작업의 Context Receipt Gate 통과
+
+**Gate Out** (다음 단계 진입 조건):
+- [ ] `src/components/` 에 주요 컴포넌트 존재
+- [ ] `src/data/mockData.ts` 존재 (필요 시)
+- [ ] `npm run dev` 정상 작동 확인
+
+**위임 지시**:
+
+```
+사용할 스킬: rules-react + tools-shadcn
+입력: docs/02_UI_Screens/ 의 화면 설계 및 디자인 가이드, Component & Library Plan
+순서: 화면 중요도 순으로 처리 (홈 → 주요 기능 화면 → 기타)
+```
+
+Phase 3 완료 확인 후 다음을 묻는다:
+> "Phase 3이 완료되었습니다. Phase 4(개발문서)로 넘어갈까요?"
+
+Phase 3 완료 보고에는 `Flow Status Block`을 포함한다.
+
+---
+
+## Phase 4: 개발문서 (Technical_Specs / Logic_Progress / QA_Validation)
+
+**목표**: 구현된 코드베이스를 기반으로 기술 명세, 로직 설계, QA 체크리스트를 작성한다.
+
+**Gate In**:
+- React 컴포넌트 구현 완료 (Phase 3)
+
+**Gate Out** (프로젝트 완성 조건):
+- [ ] `docs/03_Technical_Specs/00_DEVELOPMENT_PRINCIPLES.md` 존재
+- [ ] `docs/03_Technical_Specs/01_DB_SCHEMA.md` 존재 (DB 사용 시)
+- [ ] `docs/03_Technical_Specs/02_API_SPECS.md` 존재 (API 사용 시)
+- [ ] `docs/04_Logic_Progress/00_ROADMAP.md` 존재
+- [ ] `docs/05_QA_Validation/02_QA_CHECKLIST.md` 존재
+
+**위임 지시**:
+
+```
+사용할 스킬: docs-dev
+순서: Technical_Specs → Logic_Progress → QA_Validation
+시작 전: 코드베이스 분석 (아키텍처, 패턴, 스탠다드, 툴링)
+```
+
+Phase 4 완료 확인 후 다음을 묻는다:
+> "Phase 4 문서가 완성되었습니다. Phase 5(품질 검증)로 넘어갈까요?"
+
+Phase 4 완료 보고에는 `Flow Status Block`을 포함한다.
+
+---
+
+## Phase 5: Quality Gate (품질 검증)
+
+**목표**: 코드·문서·보안·성능 전 영역을 통합 검증하여 배포 가능 수준임을 확인한다.
+
+**Gate In**:
+- Phase 4 문서 (`03_Technical_Specs/`, `04_Logic_Progress/`, `05_QA_Validation/`) 존재
+- React 코드 구현 완료 (Phase 3)
+
+**Gate Out** (다음 단계 진입 조건):
+- [ ] `code`와 `deploy` 작업의 읽기 전용 Verification Agent 실행
+- [ ] Verification Receipt PASS 또는 warning 발견 사항에 사용자 진행 승인 — 명령 결과, 미실행 사유, QA 문서 또는 PR 상세 근거
+- [ ] Coordinator가 warning 기간의 verify 발견 사항을 기록하고 사용자 진행 승인을 받음. blocking 전환 후에는 Coordinator가 내부 `verify TASK-ID --strict`를 통과시킴
+- [ ] `verify-docs` PASS — 문서 구조·메타데이터 정합성
+- [ ] `verify-ui` PASS — 구현 UI와 화면 문서·사용자 동선·상태별 UI 정합성
+- [ ] `verify-code` PASS — 코드 품질 (로직, 타입, 중복, 사이드 이펙트)
+- [ ] `verify-security` PASS — OWASP Top 10 기준 보안 이슈 없음
+- [ ] `verify-performance` PASS — Lighthouse Performance 90+, Core Web Vitals 기준 충족
+- [ ] `verify-drizzle-schema` PASS — DB 스키마 정합성 (DB 사용 시)
+- [ ] `verify-skills` PASS — 스킬 패키지 변경 시 메타데이터·CLI·패키징 정합성
+
+**위임 지시**:
+
+```
+사용할 스킬: verify-implementation
+동작: Change Receipt 직후 Coordinator가 이 스킬을 자동 실행해 위 verify-* 스킬과 내부 Receipt 검사를 수행하고 통합 보고서 생성
+FAIL 항목 발견 시: 해당 스킬로 돌아가 수정 후 재검증
+```
+
+FAIL 항목이 있으면 해당 Phase로 되돌아가 수정 후 재실행한다. 모든 항목 PASS 확인 후 다음을 묻는다:
+> "모든 검증을 통과했습니다. Phase 6(최종 전달물)으로 넘어갈까요?"
+
+Phase 5 검증 보고에는 `Flow Status Block`을 포함하고, Fail이 있으면 `필요 확인`에 차단 항목을 적는다.
+
+---
+
+## Phase 6: 최종 전달물 (선택)
+
+**목표**: 완성된 제품을 바탕으로 외부 커뮤니케이션 자료를 생성한다.
+
+**Gate In**:
+- Phase 5 Quality Gate 전체 PASS
+
+**선택 항목** (하나 이상 선택, 복수 가능):
+
+| 전달물 | 사용 스킬 | 용도 |
+|--------|-----------|------|
+| 피치덱 | `docs-pitch` | 투자자·해커톤·데모데이 발표 자료 |
+| 사업계획서 | `docs-business` | 정부 지원·투자 심사·파트너십 문서 |
+
+**위임 지시**:
+
+```
+사용할 스킬: docs-pitch 또는 docs-business (사용자 선택)
+참조 문서: docs/01_Concept_Design/ + docs/03_Technical_Specs/ 전체
+```
+
+전체 파이프라인 완료 후 최종 보고:
+
+```
+[Flow]
+현재: Phase 6 — 최종 전달물 또는 Handoff
+Gate: 완료
+완료: Phase 1, Phase 2, HTML UI Preview Gate, UI-First Gate, Pre-Code Technical Brief, Component & Library Planning Gate, Context Receipt Gate, Phase 3, Phase 4, Phase 5
+다음: 사용자 선택 후속 작업
+필요 확인: 남은 TODO 또는 없음
+권장 스킬: /docs-pitch 또는 /docs-business (선택)
+
+전체 워크플로우 완료
+- Phase 1: docs/01_Concept_Design/        기획문서
+- Phase 2: docs/02_UI_Screens/            UI 설계 문서
+- Gates: HTML UI Preview, UI-First, Pre-Code Technical Brief, Component & Library Planning, Context Receipt 완료
+- Phase 3: src/components/               React 컴포넌트
+- Phase 4: docs/03~05_*/                 개발·진행·QA 문서
+- Phase 5: verify-implementation PASS    품질 검증 완료
+- Phase 6: docs-pitch / docs-business    최종 전달물 (선택)
+```
+
+## Final Handoff Checklist
+
+Phase 6이 선택 사항이어도, 작업을 마무리할 때는 아래 항목을 최종 보고에 포함한다.
+
+- [ ] 현재 Phase와 완료된 Phase 목록
+- [ ] 구현 또는 문서 산출물 경로
+- [ ] HTML UI Preview, UI-First Gate, Pre-Code Technical Brief, Component & Library Planning Gate, Context Receipt Gate 충족 여부
+- [ ] code/deploy 작업의 독립 Verification Receipt 및 상세 근거 링크
+- [ ] 실행한 verify 스킬과 결과
+- [ ] 배포 URL 또는 로컬 실행 방법 (해당 시)
+- [ ] 남은 TODO, Known Issue, 문서-구현 불일치 여부
+- [ ] 다음 작업자가 바로 이어갈 수 있는 다음 액션
+
+---
+
+## Anti-Rush Rules (AGENTS.md 준수)
+
+- 각 Phase의 Gate Out 조건이 충족되지 않으면 다음 단계로 넘어가지 않는다.
+- 단계 완료를 AI가 임의로 선언하지 않는다. 사용자가 "다음으로 가자"고 먼저 말하거나 Gate Out 조건이 검증될 때까지 현재 단계에 머문다.
+- "다음으로 넘어갈까요?" 대신 "현재 단계에서 더 보완할 점이 있나요?"를 먼저 묻는다.
+
+---
+
+## Mid-Flow Entry (중간 단계 진입)
+
+사용자가 특정 Phase를 지정하면 해당 Phase의 Gate In 조건만 확인 후 바로 시작한다.
+
+---
+
+## Related Skills
+
+- **docs-plan**: Phase 1, 2 문서 작성
+- **rules-react**: Phase 3 React 개발
+- **docs-dev**: Phase 4 기술 문서 작성
+- **verify-implementation**: Phase 5 품질 검증 통합 실행
+- **verify-ui**: Phase 5 UI 정합성 검증
+- **verify-code**: Phase 5 코드 품질 리뷰
+- **verify-security**: Phase 5 보안 점검
+- **verify-performance**: Phase 5 성능 점검
+- **verify-skills**: 스킬 패키지 변경 검증
+- **docs-pitch**: Phase 6 피치덱 작성
+- **docs-business**: Phase 6 사업계획서 작성

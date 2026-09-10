@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implementation Verification"
+  short_description: "Run independent verification skills and gates"
+  default_prompt: "Use $verify-implementation to run relevant verify skills, confirm minimal implementation, and require independent Verification Receipt evidence before PR."
