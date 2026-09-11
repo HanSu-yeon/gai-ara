@@ -10,6 +10,11 @@ interface UploadFlowProps {
   onUploaded: () => void | Promise<void>;
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 /**
  * ZIP 파싱은 전부 브라우저에서 일어난다 (@gai-ara/ig-parser).
  * 서버로는 정규화된 "내 아이디"와 내가 팔로우하는 사람 목록만 전송한다.
@@ -96,7 +101,7 @@ export function UploadFlow({ onUploaded }: UploadFlowProps) {
         onDrop={(event) => { event.preventDefault(); setDragging(false); selectFile(event.dataTransfer.files[0] ?? null); }}>
         <span className="feature-icon"><Icon name="upload" /></span>
         <strong>{file ? file.name : <>여기에 ZIP 파일을 드래그하거나<br />눌러서 선택하세요</>}</strong>
-        <small>{file ? `${(file.size / 1024 / 1024).toFixed(1)} MB · 눌러서 파일 변경` : "ZIP 파일만 업로드할 수 있어요."}</small>
+        <small>{file ? `${formatFileSize(file.size)} · 눌러서 파일 변경` : "ZIP 파일만 업로드할 수 있어요."}</small>
         <input id="zipFile" type="file" accept=".zip" aria-label="Instagram 데이터 ZIP 파일 선택"
           onChange={(event) => selectFile(event.target.files?.[0] ?? null)} />
       </label>
