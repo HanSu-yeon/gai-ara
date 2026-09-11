@@ -26,6 +26,8 @@ export const meResultSchema = z.object({
     within2: z.number().int().nonnegative(),
     within3: z.number().int().nonnegative(),
   }),
+  /** 세션이 사라져도 "내 결과"로 돌아올 수 있는 개인용 복구 토큰. */
+  recoveryToken: z.string(),
 });
 export type MeResult = z.infer<typeof meResultSchema>;
 

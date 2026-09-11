@@ -7,6 +7,7 @@ import { UploadFlow } from "@/components/UploadFlow";
 import { BrandHeader, Character, Centered, StatusMessage } from "@/components/Brand";
 import { UnreachableResult } from "@/components/UnreachableResult";
 import { formatConnectionPhrase } from "@/lib/distance-copy";
+import { trackEvent } from "@/lib/analytics";
 
 type InviteStatus = "pending" | "accepted" | "expired" | "not-found";
 
@@ -67,8 +68,10 @@ export default function LivePairPage() {
     if (!accepted.ok) throw new Error("초대를 수락하지 못했어요. 링크를 다시 확인해주세요.");
     const response = await fetch(`/api/pairs/${token}/result`);
     if (!response.ok) throw new Error("결과를 불러오지 못했어요. 다시 시도해주세요.");
-    setPairResult((await response.json()) as PairResult);
+    const data = (await response.json()) as PairResult;
+    setPairResult(data);
     setInviteStatus("accepted");
+    trackEvent("distance_result", { source: "pair", status: data.status, ...(data.distance !== null ? { distance: data.distance } : {}) });
   }
 
   /**

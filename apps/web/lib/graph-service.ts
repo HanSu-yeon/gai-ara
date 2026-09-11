@@ -1,6 +1,6 @@
 import { buildGraph, distanceCountsFrom, shortestDistance } from "@gai-ara/graph";
 import type { MeResult, PairResult } from "@gai-ara/shared";
-import { getAllEdges } from "./participants";
+import { getAllEdges, getRecoveryToken } from "./participants";
 
 /**
  * MVP 규모(참여자 수천~수만)에서는 매 요청마다 전체 edge를 읽어
@@ -11,8 +11,9 @@ export async function computeMeResult(participantId: string): Promise<MeResult> 
   const edges = await getAllEdges();
   const graph = buildGraph(edges);
   const counts = distanceCountsFrom(graph, participantId);
+  const recoveryToken = await getRecoveryToken(participantId);
 
-  return { distanceCounts: counts };
+  return { distanceCounts: counts, recoveryToken: recoveryToken ?? "" };
 }
 
 export async function computePairResult(

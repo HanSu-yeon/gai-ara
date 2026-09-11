@@ -1,21 +1,51 @@
+import { randomBytes } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { getDb, follows, participants } from "@gai-ara/db";
 
-/** identityHash로 참여자를 upsert하고 항상 id를 돌려준다. */
-export async function upsertParticipant(identityHash: string): Promise<string> {
+/**
+ * identityHash로 참여자를 upsert하고 id와 recoveryToken을 돌려준다.
+ * recoveryToken은 최초 생성 시 한 번만 발급하고, 재업로드(이미 있는
+ * identityHash)에는 그대로 유지한다 — 세션 쿠키가 지워져도 이 값으로
+ * "내 결과"를 다시 찾아올 수 있다(§ /result/[token]).
+ */
+export async function upsertParticipant(identityHash: string): Promise<{ id: string; recoveryToken: string }> {
   const db = getDb();
+  const recoveryToken = randomBytes(16).toString("hex");
+
   const [row] = await db
     .insert(participants)
-    .values({ identityHash })
+    .values({ identityHash, recoveryToken })
     .onConflictDoUpdate({
       target: participants.identityHash,
-      // 값 변경 없이 RETURNING을 받기 위한 no-op 업데이트
+      // recoveryToken은 기존 값을 유지한다 — 새로 생성한 값으로 덮어쓰지 않는다.
       set: { identityHash: sql`excluded.identity_hash` },
     })
-    .returning({ id: participants.id });
+    .returning({ id: participants.id, recoveryToken: participants.recoveryToken });
 
   if (!row) throw new Error("participant upsert returned no row");
-  return row.id;
+  return row;
+}
+
+/** 복구 토큰으로 participantId를 찾는다. 없으면 null. */
+export async function getParticipantIdByRecoveryToken(recoveryToken: string): Promise<string | null> {
+  const db = getDb();
+  const [row] = await db
+    .select({ id: participants.id })
+    .from(participants)
+    .where(eq(participants.recoveryToken, recoveryToken))
+    .limit(1);
+  return row?.id ?? null;
+}
+
+/** participantId로 복구 토큰을 가져온다 — "내 결과 저장 링크"를 보여줄 때 쓴다. */
+export async function getRecoveryToken(participantId: string): Promise<string | null> {
+  const db = getDb();
+  const [row] = await db
+    .select({ recoveryToken: participants.recoveryToken })
+    .from(participants)
+    .where(eq(participants.id, participantId))
+    .limit(1);
+  return row?.recoveryToken ?? null;
 }
 
 export async function participantExists(id: string): Promise<boolean> {

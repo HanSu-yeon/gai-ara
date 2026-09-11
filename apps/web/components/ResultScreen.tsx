@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { MeResult, ReferralLink } from "@gai-ara/shared";
 import { BigNumberCard } from "@/components/BigNumberCard";
 import { BrandHeader, Character, Icon } from "@/components/Brand";
+import { trackEvent } from "@/lib/analytics";
 
 /**
  * 1:1 "우리 몇 다리 링크"(pair invite) 생성 UI는 의도적으로 여기서 뺐다 —
@@ -15,7 +16,7 @@ import { BrandHeader, Character, Icon } from "@/components/Brand";
  * 생기면 이 화면에 다시 노출하면 된다.
  */
 export function ResultScreen({ preview = false }: { preview?: boolean }) {
-  const [result, setResult] = useState<MeResult | null>(preview ? { distanceCounts: { direct: 12, within2: 84, within3: 216 } } : null);
+  const [result, setResult] = useState<MeResult | null>(preview ? { distanceCounts: { direct: 12, within2: 84, within3: 216 }, recoveryToken: "preview" } : null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [referralLink, setReferralLink] = useState<ReferralLink | null>(preview ? { token: "preview", nickname: null, visits: [{ nickname: "미리보기", status: "connected", distance: 1 }] } : null);
@@ -23,6 +24,8 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
   const [referralCreating, setReferralCreating] = useState(false);
   const [referralError, setReferralError] = useState<string | null>(null);
   const [referralCopied, setReferralCopied] = useState(false);
+  const [recoveryCopied, setRecoveryCopied] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (preview) return;
@@ -44,6 +47,7 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
       if (!response.ok) throw new Error("링크를 만들지 못했어요. 잠시 후 다시 시도해주세요.");
       setReferralLink((await response.json()) as ReferralLink);
       setReferralCopied(false);
+      trackEvent("referral_link_create");
     } catch (err) { setReferralError(err instanceof Error ? err.message : "연결 상태를 확인해주세요."); }
     finally { setReferralCreating(false); }
   }
@@ -54,7 +58,17 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
     try {
       await navigator.clipboard.writeText(`${window.location.origin}/r/${referralLink.token}`);
       setReferralCopied(true);
+      trackEvent("referral_link_copy");
     } catch { setReferralError("자동 복사가 되지 않아요. 링크를 길게 눌러 직접 복사해주세요."); }
+  }
+
+  async function handleCopyRecoveryLink() {
+    if (!result) return;
+    if (preview) { setRecoveryCopied(true); return; }
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/result/${result.recoveryToken}`);
+      setRecoveryCopied(true);
+    } catch { setRecoveryError("자동 복사가 되지 않아요. 링크를 길게 눌러 직접 복사해주세요."); }
   }
 
   async function loadResult() {
@@ -108,6 +122,11 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
         <div className="flex items-center justify-between"><h2 className="font-bold text-deep-green">내 연결 결과</h2><button type="button" className="text-link text-xs" onClick={handleRefresh} disabled={refreshing}>{refreshing ? "확인 중…" : "다시 확인하기"}</button></div>
         <div className="result-counts"><BigNumberCard label="직접 연결" value={result.distanceCounts.direct} /><BigNumberCard label="2다리 안" value={result.distanceCounts.within2} /><BigNumberCard label="3다리 안" value={result.distanceCounts.within3} /></div>
         {result.distanceCounts.direct === 0 && <p className="result-note">아직 가이 알아?에서 확인된 연결이 없어요. 친구를 초대하면 첫 연결이 생겨요!</p>}
+        <button type="button" className="text-link text-xs mt-4" onClick={handleCopyRecoveryLink}>
+          {recoveryCopied ? "복사했어요!" : "내 결과 저장 링크 복사하기"}
+        </button>
+        {recoveryError && <p className="error-message" role="alert">{recoveryError}</p>}
+        <p className="result-note">이 링크를 저장해두면 다른 기기나 브라우저에서도 내 결과를 다시 볼 수 있어요.</p>
       </section>
 </>}
   </main>;

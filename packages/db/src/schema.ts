@@ -18,13 +18,21 @@ import {
  * 등장하고 아직 업로드하지 않은 사람은 `follows.followee_identity_hash`에
  * 해시만 남고, 이 테이블에는 그 사람이 직접 업로드하기 전까지 행이
  * 생기지 않는다.
+ *
+ * recoveryToken: 세션 쿠키가 지워지거나(시크릿 모드, 다른 기기, 쿠키 삭제)
+ * DB가 초기화돼도 "내 결과"로 돌아올 수 있게 하는 개인용 복구 링크 값.
+ * 참가자 최초 생성 시 한 번 발급되고 재업로드해도 그대로 유지된다 —
+ * referralLinks.token과 달리 이건 아무에게도 공유되지 않고 본인만 안다는
+ * 전제로 세션 대신 쓸 수 있다(§ /result/[token]).
  */
 export const participants = pgTable("participants", {
   id: uuid("id").defaultRandom().primaryKey(),
   identityHash: text("identity_hash").notNull(),
+  recoveryToken: text("recovery_token").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   identityHashUnique: uniqueIndex("participants_identity_hash_key").on(table.identityHash),
+  recoveryTokenUnique: uniqueIndex("participants_recovery_token_key").on(table.recoveryToken),
 }));
 
 /** 로그인 없이 "내 결과 다시 보기"를 지원하기 위한 최소한의 세션. */

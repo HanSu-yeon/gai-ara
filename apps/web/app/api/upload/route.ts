@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   }
 
   const selfHash = hashUsername(selfUsername);
-  const selfId = await upsertParticipant(selfHash);
+  const { id: selfId } = await upsertParticipant(selfHash);
 
   const followeeHashes = followingUsernames.map(hashUsername);
   await syncFollowingBatch(selfId, followeeHashes);

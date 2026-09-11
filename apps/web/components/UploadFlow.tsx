@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { Character, ConnectionSearchArt, Icon, PrivacyNote, Steps } from "@/components/Brand";
 import { InstagramExportParseError, parseFollowingFromZip, suggestUsernameFromFilename } from "@gai-ara/ig-parser";
+import { trackEvent } from "@/lib/analytics";
 
 type Status = "idle" | "parsing" | "uploading" | "error";
 
@@ -57,11 +58,14 @@ export function UploadFlow({ onUploaded }: UploadFlowProps) {
         throw new Error(typeof failure?.error === "string" ? failure.error : "업로드에 실패했어요. 잠시 후 다시 시도해주세요.");
       }
 
+      trackEvent("upload_success");
       await onUploaded();
     } catch (err) {
       setStatus("error");
+      const isParseError = err instanceof InstagramExportParseError;
+      trackEvent("upload_error", { reason: isParseError ? "parse_error" : "request_error" });
       setError(
-        err instanceof InstagramExportParseError
+        isParseError
           ? err.message
           : err instanceof Error
             ? err.message

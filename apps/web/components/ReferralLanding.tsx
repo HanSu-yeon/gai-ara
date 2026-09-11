@@ -7,6 +7,7 @@ import { UploadFlow } from "@/components/UploadFlow";
 import { BrandHeader, Character, Centered, StatusMessage } from "@/components/Brand";
 import { UnreachableResult } from "@/components/UnreachableResult";
 import { formatConnectionPhrase } from "@/lib/distance-copy";
+import { trackEvent } from "@/lib/analytics";
 
 type LinkStatus = "loading" | "not-found" | "ready";
 
@@ -14,9 +15,9 @@ type LinkStatus = "loading" | "not-found" | "ready";
  * 재사용 가능한 "내 링크"의 공개 랜딩. `pair_invites`(1:1, 1회용)와 달리
  * 특정 상대를 지정하지 않는다 — 여러 명이 같은 링크로 들어와서 각자
  * 업로드를 마치면, owner와의 거리를 그 자리에서 계산해 보여준다. 그
- * 결과는 owner에게 저장되지 않는다(방문자 목록 자체가 없음) — 지금
- * 요청한 사람에게만 보여주는 일회성 계산이다. LivePairPage와 최대한
- * 같은 구조를 쓴다.
+ * 결과는 owner가 나중에 `/connections`에서 다시 볼 수 있게 남지만, 중간
+ * 연결자는 그래프 계산 자체가 절대 돌려주지 않는다. LivePairPage와
+ * 최대한 같은 구조를 쓴다.
  */
 export function ReferralLanding() {
   const params = useParams<{ token: string }>();
@@ -59,7 +60,9 @@ export function ReferralLanding() {
       body: JSON.stringify({ nickname: visitorNickname.trim() || undefined }),
     });
     if (!response.ok) throw new Error("결과를 불러오지 못했어요. 다시 시도해주세요.");
-    setResult((await response.json()) as ReferralResult);
+    const data = (await response.json()) as ReferralResult;
+    setResult(data);
+    trackEvent("distance_result", { source: "referral", status: data.status, ...(data.distance !== null ? { distance: data.distance } : {}) });
   }
 
   // 세션이 있어도 자동으로 계산하지 않는다 — "바로 확인하기"를 눌러야
@@ -112,10 +115,7 @@ export function ReferralLanding() {
         {nickname ? <>{nickname}님이 초대했어요</> : "친구가 초대했어요"}<br />
         우리 몇 다리 건너<br />아는 사이일까요?
       </h1>
-      <p className="subtitle mb-6">
-        내 인스타 데이터로 제주에서 몇 다리 건너<br />아는 사이인지 확인해볼 수 있어요.
-      </p>
-      <input className="username-input mb-3" value={visitorNickname} onChange={(event) => setVisitorNickname(event.target.value)}
+      <input className="username-input mb-3 mt-6" value={visitorNickname} onChange={(event) => setVisitorNickname(event.target.value)}
         placeholder="내 닉네임 (선택, 상대방에게 보여요)" maxLength={20} aria-label="내 닉네임" />
       {hasSession && !wantsReupload ? (
         <>
