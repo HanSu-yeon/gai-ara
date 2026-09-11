@@ -24,6 +24,7 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
   const [referralCreating, setReferralCreating] = useState(false);
   const [referralError, setReferralError] = useState<string | null>(null);
   const [referralCopied, setReferralCopied] = useState(false);
+  const [editingNickname, setEditingNickname] = useState(false);
   const [recoveryCopied, setRecoveryCopied] = useState(false);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
 
@@ -31,12 +32,16 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
     if (preview) return;
     fetch("/api/referral-link")
       .then(async (response) => (response.ok ? (await response.json()) as ReferralLink : null))
-      .then(setReferralLink)
+      .then((link) => {
+        setReferralLink(link);
+        if (link?.nickname) setReferralNickname(link.nickname);
+      })
       .catch(() => {});
   }, [preview]);
 
+  /** 링크가 없으면 새로 만들고, 이미 있으면 닉네임만 갱신한다(둘 다 같은 upsert). */
   async function handleCreateReferralLink() {
-    if (preview) return;
+    if (preview) { setEditingNickname(false); return; }
     setReferralCreating(true); setReferralError(null);
     try {
       const response = await fetch("/api/referral-link", {
@@ -45,9 +50,11 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
         body: JSON.stringify({ nickname: referralNickname.trim() || undefined }),
       });
       if (!response.ok) throw new Error("링크를 만들지 못했어요. 잠시 후 다시 시도해주세요.");
-      setReferralLink((await response.json()) as ReferralLink);
+      const link = (await response.json()) as ReferralLink;
+      setReferralLink(link);
       setReferralCopied(false);
-      trackEvent("referral_link_create");
+      setEditingNickname(false);
+      trackEvent(referralLink ? "referral_link_nickname_update" : "referral_link_create");
     } catch (err) { setReferralError(err instanceof Error ? err.message : "연결 상태를 확인해주세요."); }
     finally { setReferralCreating(false); }
   }
@@ -106,6 +113,18 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
       <Character kind="heart" className="result-character" />
       {referralLink ? <>
         <div className="invite-box"><input aria-label="내 링크" value={`${typeof window !== "undefined" ? window.location.origin : ""}/r/${referralLink.token}`} readOnly onFocus={(event) => event.target.select()} /><button onClick={handleCopyReferralLink}>{referralCopied ? "복사했어요!" : "내 링크 복사하기"}</button></div>
+        {editingNickname ? <>
+          <input className="username-input mb-3 mt-3" value={referralNickname} onChange={(event) => setReferralNickname(event.target.value)}
+            placeholder="내 닉네임 (선택, 방문자에게 보여요)" maxLength={20} aria-label="내 링크 닉네임" autoFocus />
+          <div className="flex gap-2">
+            <button type="button" className="primary-button flex-1" onClick={handleCreateReferralLink} disabled={referralCreating}>{referralCreating ? "저장하는 중…" : "저장하기"}</button>
+            <button type="button" className="text-link text-xs" onClick={() => { setEditingNickname(false); setReferralNickname(referralLink.nickname ?? ""); }}>취소</button>
+          </div>
+        </> : (
+          <button type="button" className="text-link text-xs mt-3" onClick={() => setEditingNickname(true)}>
+            {referralLink.nickname ? `닉네임 "${referralLink.nickname}" 수정` : "닉네임 설정하기"}
+          </button>
+        )}
         <Link href="/connections" className="text-link text-xs mt-3">
           {referralLink.visits.length > 0 ? `내 링크로 만난 사람 ${referralLink.visits.length}명 보기` : "내 연결 목록 보기"} →
         </Link>
