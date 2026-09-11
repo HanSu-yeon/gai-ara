@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import type { ReferralResult } from "@gai-ara/shared";
 import { UploadFlow } from "@/components/UploadFlow";
-import { BrandHeader, Character, Centered, StatusMessage } from "@/components/Brand";
+import { BrandHeader, Character, Centered, Icon, StatusMessage } from "@/components/Brand";
 import { UnreachableResult } from "@/components/UnreachableResult";
 import { formatConnectionPhrase } from "@/lib/distance-copy";
 import { trackEvent } from "@/lib/analytics";
@@ -129,7 +130,12 @@ export function ReferralLanding() {
           </button>
         </>
       ) : (
-        <UploadFlow onUploaded={handleUploaded} />
+        <>
+          <UploadFlow onUploaded={handleUploaded} />
+          <Link href="/upload/guide" className="guide-button">
+            데이터 받는 법 보기 <Icon name="arrow" />
+          </Link>
+        </>
       )}
     </main>
   );
