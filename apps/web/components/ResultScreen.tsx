@@ -2,20 +2,60 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { MeResult } from "@gai-ara/shared";
+import type { MeResult, ReferralLink } from "@gai-ara/shared";
 import { BigNumberCard } from "@/components/BigNumberCard";
 import { BrandHeader, Character, Icon } from "@/components/Brand";
 
+/**
+ * 1:1 "우리 몇 다리 링크"(pair invite) 생성 UI는 의도적으로 여기서 뺐다 —
+ * API/DB(`/api/invites`, `pair_invites`)와 `/pair/[token]` 화면은 그대로
+ * 살아있고, 코드도 그대로 있다. 지금 이 서비스의 기본 흐름은 "내 링크"
+ * 하나(만들기 → 여러 명에게 보내기 → 각자 결과 확인)라서, 화면에는 그것만
+ * 보여준다. "특정 친구와 서로 결과를 같이 보고 싶다"는 니즈가 실제로
+ * 생기면 이 화면에 다시 노출하면 된다.
+ */
 export function ResultScreen({ preview = false }: { preview?: boolean }) {
   const [result, setResult] = useState<MeResult | null>(preview ? { distanceCounts: { direct: 12, within2: 84, within3: 216 } } : null);
   const [error, setError] = useState<string | null>(null);
-  const [inviteError, setInviteError] = useState<string | null>(null);
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
-  const [inviteLabel, setInviteLabel] = useState("");
-  const [inviteNickname, setInviteNickname] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [referralLink, setReferralLink] = useState<ReferralLink | null>(preview ? { token: "preview", nickname: null, visitCount: 3 } : null);
+  const [referralNickname, setReferralNickname] = useState("");
+  const [referralCreating, setReferralCreating] = useState(false);
+  const [referralError, setReferralError] = useState<string | null>(null);
+  const [referralCopied, setReferralCopied] = useState(false);
+
+  useEffect(() => {
+    if (preview) return;
+    fetch("/api/referral-link")
+      .then(async (response) => (response.ok ? (await response.json()) as ReferralLink : null))
+      .then(setReferralLink)
+      .catch(() => {});
+  }, [preview]);
+
+  async function handleCreateReferralLink() {
+    if (preview) return;
+    setReferralCreating(true); setReferralError(null);
+    try {
+      const response = await fetch("/api/referral-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname: referralNickname.trim() || undefined }),
+      });
+      if (!response.ok) throw new Error("링크를 만들지 못했어요. 잠시 후 다시 시도해주세요.");
+      setReferralLink((await response.json()) as ReferralLink);
+      setReferralCopied(false);
+    } catch (err) { setReferralError(err instanceof Error ? err.message : "연결 상태를 확인해주세요."); }
+    finally { setReferralCreating(false); }
+  }
+
+  async function handleCopyReferralLink() {
+    if (!referralLink) return;
+    if (preview) { setReferralCopied(true); return; }
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/r/${referralLink.token}`);
+      setReferralCopied(true);
+    } catch { setReferralError("자동 복사가 되지 않아요. 링크를 길게 눌러 직접 복사해주세요."); }
+  }
 
   async function loadResult() {
     const response = await fetch("/api/me/result");
@@ -45,50 +85,21 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
     }
   }
 
-  async function handleCreateInvite() {
-    if (preview) {
-      setInviteUrl(`${window.location.origin}/preview?screen=pair`);
-      setCopied(false);
-      return;
-    }
-    setCreating(true); setInviteError(null);
-    try {
-      const response = await fetch("/api/invites", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          label: inviteLabel.trim() || undefined,
-          nickname: inviteNickname.trim() || undefined,
-        }),
-      });
-      if (!response.ok) throw new Error("링크를 만들지 못했어요. 잠시 후 다시 시도해주세요.");
-      const { token } = await response.json() as { token: string };
-      setInviteUrl(`${window.location.origin}/pair/${token}`); setCopied(false);
-    } catch (err) { setInviteError(err instanceof Error ? err.message : "연결 상태를 확인해주세요."); }
-    finally { setCreating(false); }
-  }
-  async function handleCopy() {
-    if (!inviteUrl) return;
-    try { await navigator.clipboard.writeText(inviteUrl); setCopied(true); setInviteError(null); }
-    catch { setInviteError("자동 복사가 되지 않아요. 위 링크를 길게 눌러 직접 복사해주세요."); }
-  }
-
   return <main className="brand-page result-page"><BrandHeader home />
     {error ? <><Character kind="search" className="result-character" /><h1 className="upload-heading">결과를 확인할 수 없어요</h1><p className="subtitle" role="alert">{error}</p><Link href="/upload" className="primary-button mt-8">파일 업로드하기 <Icon name="arrow" /></Link></>
     : !result ? <section className="analysis-state" role="status"><h1 className="upload-heading">연결을 찾고 있어요</h1><Character kind="search" /><p className="subtitle">결과를 계산하고 있어요…</p><div className="progress-track" /></section>
-    : <><p className="handwritten">분석이 완료됐어요!</p><h1 className="upload-heading">이제, 아는 사람에게<br /><em>보내볼까요?</em></h1><p className="subtitle">링크를 보내고, 둘이 함께 참여하면<br />몇 다리 건너 아는 사이인지 찾아볼게요.</p>
+    : <><p className="handwritten">분석이 완료됐어요!</p><h1 className="upload-heading">이제, 내 링크를<br /><em>만들어볼까요?</em></h1><p className="subtitle">여러 명에게 보내면, 각자 나와<br />몇 다리 건너 아는 사이인지 확인할 수 있어요.</p>
       <Character kind="heart" className="result-character" />
-      {!inviteUrl && <>
-        <input className="username-input mb-3" value={inviteNickname} onChange={(event) => setInviteNickname(event.target.value)}
-          placeholder="내 닉네임 (선택, 상대방에게 보여요)" maxLength={20} aria-label="공개용 닉네임" />
-        <input className="username-input mb-3" value={inviteLabel} onChange={(event) => setInviteLabel(event.target.value)}
-          placeholder="누구에게 보낼지 메모 (선택, 나만 볼 수 있어요)" maxLength={40} aria-label="초대 메모" />
+      {referralLink ? <>
+        <div className="invite-box"><input aria-label="내 링크" value={`${typeof window !== "undefined" ? window.location.origin : ""}/r/${referralLink.token}`} readOnly onFocus={(event) => event.target.select()} /><button onClick={handleCopyReferralLink}>{referralCopied ? "복사했어요!" : "내 링크 복사하기"}</button></div>
+        <p className="result-note">지금까지 {referralLink.visitCount}번 열렸어요.</p>
+      </> : <>
+        <input className="username-input mb-3" value={referralNickname} onChange={(event) => setReferralNickname(event.target.value)}
+          placeholder="내 닉네임 (선택, 방문자에게 보여요)" maxLength={20} aria-label="내 링크 닉네임" />
+        <button className="primary-button" onClick={handleCreateReferralLink} disabled={referralCreating}><Icon name="link" />{referralCreating ? "만드는 중…" : "내 링크 만들기"}<Icon name="arrow" /></button>
       </>}
-      <button className="primary-button" onClick={handleCreateInvite} disabled={creating}><Icon name="link" />{creating ? "링크 만드는 중…" : inviteUrl ? "새 링크 만들기" : "링크 만들기"}<Icon name="arrow" /></button>
-      {inviteUrl && <div className="invite-box"><input aria-label="친구 초대 링크" value={inviteUrl} readOnly onFocus={(event) => event.target.select()} /><button onClick={handleCopy}>{copied ? "복사했어요!" : "복사하기"}</button></div>}
-      {inviteError && <p className="error-message" role="alert">{inviteError}</p>}
-      <p className="result-note" aria-live="polite">{copied ? "링크를 복사했어요. 친구에게 보내보세요!" : "상대도 참여하면 둘 사이의 결과가 열려요."}</p>
-      <Link href="/connections" className="text-link text-xs">내 연결 목록 보기 <Icon name="arrow" /></Link>
+      {referralError && <p className="error-message" role="alert">{referralError}</p>}
+      <p className="result-note" aria-live="polite">{referralCopied ? "링크를 복사했어요. 친구에게 보내보세요!" : "누가 열어봤는지는 저장하지 않고, 열린 횟수만 세요 — 결과는 지금 확인하는 사람에게만 보여줘요."}</p>
       <section className="mt-8 border-t border-ink/10 pt-6">
         <div className="flex items-center justify-between"><h2 className="font-bold text-deep-green">내 연결 결과</h2><button type="button" className="text-link text-xs" onClick={handleRefresh} disabled={refreshing}>{refreshing ? "확인 중…" : "다시 확인하기"}</button></div>
         <div className="result-counts"><BigNumberCard label="직접 연결" value={result.distanceCounts.direct} /><BigNumberCard label="2다리 안" value={result.distanceCounts.within2} /><BigNumberCard label="3다리 안" value={result.distanceCounts.within3} /></div>
