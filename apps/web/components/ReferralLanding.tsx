@@ -29,6 +29,7 @@ export function ReferralLanding() {
   const [wantsReupload, setWantsReupload] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [visitorNickname, setVisitorNickname] = useState("");
 
   useEffect(() => {
     fetch("/api/session")
@@ -52,7 +53,11 @@ export function ReferralLanding() {
   }, [token]);
 
   async function loadResult() {
-    const response = await fetch(`/api/r/${token}/result`);
+    const response = await fetch(`/api/r/${token}/result`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nickname: visitorNickname.trim() || undefined }),
+    });
     if (!response.ok) throw new Error("결과를 불러오지 못했어요. 다시 시도해주세요.");
     setResult((await response.json()) as ReferralResult);
   }
@@ -110,6 +115,8 @@ export function ReferralLanding() {
       <p className="subtitle mb-6">
         내 인스타 데이터로 제주에서 몇 다리 건너<br />아는 사이인지 확인해볼 수 있어요.
       </p>
+      <input className="username-input mb-3" value={visitorNickname} onChange={(event) => setVisitorNickname(event.target.value)}
+        placeholder="내 닉네임 (선택, 상대방에게 보여요)" maxLength={20} aria-label="내 닉네임" />
       {hasSession && !wantsReupload ? (
         <>
           <p className="subtitle">이미 참여하셨네요 — 이 정보로 바로 확인할까요?</p>

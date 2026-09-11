@@ -18,7 +18,7 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
   const [result, setResult] = useState<MeResult | null>(preview ? { distanceCounts: { direct: 12, within2: 84, within3: 216 } } : null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [referralLink, setReferralLink] = useState<ReferralLink | null>(preview ? { token: "preview", nickname: null, visitCount: 3 } : null);
+  const [referralLink, setReferralLink] = useState<ReferralLink | null>(preview ? { token: "preview", nickname: null, visits: [{ nickname: "미리보기", status: "connected", distance: 1 }] } : null);
   const [referralNickname, setReferralNickname] = useState("");
   const [referralCreating, setReferralCreating] = useState(false);
   const [referralError, setReferralError] = useState<string | null>(null);
@@ -92,14 +92,18 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
       <Character kind="heart" className="result-character" />
       {referralLink ? <>
         <div className="invite-box"><input aria-label="내 링크" value={`${typeof window !== "undefined" ? window.location.origin : ""}/r/${referralLink.token}`} readOnly onFocus={(event) => event.target.select()} /><button onClick={handleCopyReferralLink}>{referralCopied ? "복사했어요!" : "내 링크 복사하기"}</button></div>
-        <p className="result-note">지금까지 {referralLink.visitCount}번 열렸어요.</p>
+        {referralLink.visits.length > 0 && (
+          <Link href="/connections" className="text-link text-xs mt-3">
+            내 링크로 만난 사람 {referralLink.visits.length}명 보기 →
+          </Link>
+        )}
       </> : <>
         <input className="username-input mb-3" value={referralNickname} onChange={(event) => setReferralNickname(event.target.value)}
           placeholder="내 닉네임 (선택, 방문자에게 보여요)" maxLength={20} aria-label="내 링크 닉네임" />
         <button className="primary-button" onClick={handleCreateReferralLink} disabled={referralCreating}><Icon name="link" />{referralCreating ? "만드는 중…" : "내 링크 만들기"}<Icon name="arrow" /></button>
       </>}
       {referralError && <p className="error-message" role="alert">{referralError}</p>}
-      <p className="result-note" aria-live="polite">{referralCopied ? "링크를 복사했어요. 친구에게 보내보세요!" : "누가 열어봤는지는 저장하지 않고, 열린 횟수만 세요 — 결과는 지금 확인하는 사람에게만 보여줘요."}</p>
+      <p className="result-note" aria-live="polite">{referralCopied ? "링크를 복사했어요. 친구에게 보내보세요!" : <>방문자가 남기고 싶어 하면 닉네임과 거리만 보여요.<br />중간에 누구를 통해 연결됐는지는 알 수 없어요.</>}</p>
       <section className="mt-8 border-t border-ink/10 pt-6">
         <div className="flex items-center justify-between"><h2 className="font-bold text-deep-green">내 연결 결과</h2><button type="button" className="text-link text-xs" onClick={handleRefresh} disabled={refreshing}>{refreshing ? "확인 중…" : "다시 확인하기"}</button></div>
         <div className="result-counts"><BigNumberCard label="직접 연결" value={result.distanceCounts.direct} /><BigNumberCard label="2다리 안" value={result.distanceCounts.within2} /><BigNumberCard label="3다리 안" value={result.distanceCounts.within3} /></div>

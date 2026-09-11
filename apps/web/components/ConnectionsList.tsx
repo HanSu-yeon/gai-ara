@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { MyPairSummary } from "@gai-ara/shared";
-import { BrandHeader, Character } from "@/components/Brand";
+import type { MyPairSummary, ReferralVisit } from "@gai-ara/shared";
+import { BrandHeader, Character, Icon } from "@/components/Brand";
 import { formatConnectionPhrase } from "@/lib/distance-copy";
 
 function statusLabel(pair: MyPairSummary): string {
@@ -18,16 +18,18 @@ function displayLabel(pair: MyPairSummary): string {
   return pair.inviterNickname ? `${pair.inviterNickname}님이 보낸 링크` : "받은 링크";
 }
 
-/**
- * 링크를 잃어버려도(카톡 삭제 등) 세션이 살아있는 동안은 다시 확인할 수
- * 있게 하는 "내 연결 목록" 화면. label은 inviter 자신이 남긴 메모일 때만
- * 보인다 — 상대방 신원은 어디에도 없다.
- */
 export function ConnectionsList() {
+  const [visits, setVisits] = useState<ReferralVisit[] | null>(null);
   const [pairs, setPairs] = useState<MyPairSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedVisit, setSelectedVisit] = useState<ReferralVisit | null>(null);
 
   useEffect(() => {
+    fetch("/api/referral-link")
+      .then(async (response) => (response.ok ? ((await response.json()) as { visits: ReferralVisit[] }).visits : []))
+      .then(setVisits)
+      .catch(() => setVisits([]));
+
     fetch("/api/me/pairs")
       .then(async (response) => {
         if (!response.ok) throw new Error("아직 참여 기록이 없어요. 먼저 파일을 업로드해주세요.");
@@ -38,31 +40,68 @@ export function ConnectionsList() {
       .catch(() => setError("목록을 불러오지 못했어요. 참여 기록과 연결 상태를 확인해주세요."));
   }, []);
 
+  const loading = visits === null && pairs === null && !error;
+
+  if (selectedVisit) {
+    const connected = selectedVisit.status === "connected";
+    return (
+      <main className="brand-page">
+        <header className="brand-header center-logo">
+          <button type="button" className="back-button" aria-label="목록으로 돌아가기" onClick={() => setSelectedVisit(null)}>
+            <Icon name="back" />
+          </button>
+          <img className="brand-logo" src="/assets/gai-ara_logo.png" alt="가이 알아?" />
+        </header>
+        <Character kind={connected ? "wave" : "curious"} className="result-character" />
+        <p className="pair-result-kicker">{selectedVisit.nickname ?? "이름 없는 방문자"}님과</p>
+        <p className="pair-result-title">{connected ? formatConnectionPhrase(selectedVisit.distance ?? 1) : "아직 이어지는 길을 못 찾았어요"}</p>
+        {connected && <p className="pair-result-kicker">예요!</p>}
+      </main>
+    );
+  }
+
   return (
     <main className="brand-page">
       <BrandHeader back />
       <h1 className="upload-heading">내 연결 목록</h1>
-      <p className="subtitle mb-6">내가 만들었거나 받은 링크들이에요.</p>
+      <p className="subtitle mb-6">내 링크로 만난 사람들이에요.</p>
 
       {error && <p className="error-message" role="alert">{error}</p>}
-      {!error && !pairs && <p className="subtitle">불러오는 중…</p>}
-      {!error && pairs && pairs.length === 0 && (
+      {loading && <p className="subtitle">불러오는 중…</p>}
+
+      {!error && visits && visits.length === 0 && (
         <>
           <Character kind="search" className="result-character" />
-          <p className="subtitle">아직 만들었거나 받은 링크가 없어요.</p>
+          <p className="subtitle">아직 내 링크로 만난 사람이 없어요.</p>
         </>
       )}
-      {pairs && pairs.length > 0 && (
-        <ul className="connections-list">
-          {pairs.map((pair) => (
-            <li key={pair.token}>
-              <Link href={`/pair/${pair.token}`} className="connections-list-item">
-                <span className="connections-list-label">{displayLabel(pair)}</span>
-                <span className="connections-list-status">{statusLabel(pair)}</span>
-              </Link>
+      {visits && visits.length > 0 && (
+        <ul className="referral-visits">
+          {visits.map((visit, index) => (
+            <li key={index}>
+              <button type="button" className="referral-visits-item" onClick={() => setSelectedVisit(visit)}>
+                <span>{visit.nickname ?? "이름 없는 방문자"}</span>
+                <span>{visit.status === "unreachable" ? "다리를 못 찾았어요" : formatConnectionPhrase(visit.distance ?? 1)}</span>
+              </button>
             </li>
           ))}
         </ul>
+      )}
+
+      {pairs && pairs.length > 0 && (
+        <section className="mt-8 border-t border-ink/10 pt-6">
+          <h2 className="font-bold text-deep-green">1:1 링크</h2>
+          <ul className="connections-list mt-3">
+            {pairs.map((pair) => (
+              <li key={pair.token}>
+                <Link href={`/pair/${pair.token}`} className="connections-list-item">
+                  <span className="connections-list-label">{displayLabel(pair)}</span>
+                  <span className="connections-list-status">{statusLabel(pair)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </main>
   );

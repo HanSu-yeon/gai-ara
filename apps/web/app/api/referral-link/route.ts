@@ -1,10 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createReferralLinkSchema } from "@gai-ara/shared";
-import { getOrCreateReferralLink, getReferralLinkForParticipant } from "@/lib/referral-links";
+import { getOrCreateReferralLink, getReferralLinkForParticipant, getReferralVisitsForOwner } from "@/lib/referral-links";
 import { getSessionParticipantId } from "@/lib/session";
 import { isBackendConfigured } from "@/lib/env";
 
-/** 내 소개 링크 조회 — 없으면 404(아직 만든 적 없음). 만드는 건 POST. */
+/**
+ * 내 소개 링크 조회 — 없으면 404(아직 만든 적 없음). 만드는 건 POST.
+ * 이 링크로 들어와서 업로드까지 마친 방문자들의 결과 목록도 함께 준다.
+ */
 export async function GET() {
   if (!isBackendConfigured()) {
     return NextResponse.json({ error: "지금은 서비스를 준비 중이에요. 잠시 후 다시 시도해주세요." }, { status: 503 });
@@ -19,7 +22,8 @@ export async function GET() {
   if (!link) {
     return NextResponse.json({ error: "아직 내 링크를 만들지 않았어요." }, { status: 404 });
   }
-  return NextResponse.json(link);
+  const visits = await getReferralVisitsForOwner(participantId);
+  return NextResponse.json({ ...link, visits });
 }
 
 /**
@@ -43,5 +47,6 @@ export async function POST(request: NextRequest) {
   }
 
   const link = await getOrCreateReferralLink(participantId, parsed.data.nickname);
-  return NextResponse.json(link);
+  const visits = await getReferralVisitsForOwner(participantId);
+  return NextResponse.json({ ...link, visits });
 }

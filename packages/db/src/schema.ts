@@ -97,12 +97,13 @@ export const pairInvites = pgTable("pair_invites", {
 }));
 
 /**
- * 재사용 가능한 "내 소개 링크" — `pair_invites`와 달리 특정 상대 한 명을
+ * 재사용 가능한 "내 링크" — `pair_invites`와 달리 특정 상대 한 명을
  * 지정하지 않는다. 참여자당 하나만 있고(최초 요청 시 upsert), 여러 사람이
- * 같은 링크로 들어와 각자 `/upload`로 참여할 수 있다. 특정 페어를 만들지
- * 않으므로 이 표에는 "누가 들어왔는지"를 전혀 기록하지 않는다 —
- * `visitCount`만 익명으로 증가시킨다. 실제로 서로 맞팔이면 각자 업로드를
- * 마친 뒤 그래프에서 자동으로 연결이 잡힌다(별도 매칭 로직 불필요).
+ * 같은 링크로 들어와 각자 `/upload`로 참여할 수 있다. 실제로 서로 맞팔이면
+ * 각자 업로드를 마친 뒤 그래프에서 자동으로 연결이 잡힌다(별도 매칭 로직
+ * 불필요) — 누가 방문했는지는 `referralVisits`에 남지만, 그 사람들 사이의
+ * 중간 연결자는 그래프 계산 자체가 절대 돌려주지 않으므로(§ packages/graph)
+ * 이 표와는 별개로 계속 보호된다.
  */
 export const referralLinks = pgTable("referral_links", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -112,11 +113,37 @@ export const referralLinks = pgTable("referral_links", {
   token: text("token").notNull(),
   /** pair_invites의 inviterNickname과 같은 개념 — 방문자에게 그대로 보여준다. */
   nickname: text("nickname"),
-  visitCount: integer("visit_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   tokenUnique: uniqueIndex("referral_links_token_key").on(table.token),
   ownerUnique: uniqueIndex("referral_links_owner_key").on(table.ownerParticipantId),
+}));
+
+/**
+ * 내 링크로 들어와서 업로드까지 마친 방문자 한 명당 한 행. owner가 "누구와
+ * 몇 다리인지"를 나중에 다시 볼 수 있게 하는 표 — nickname은 방문자 본인이
+ * 선택적으로 남기는 값이고(자기 신원을 owner에게 공개할지는 방문자가
+ * 결정), distance/status는 계산 결과다. 같은 방문자가 다시 확인하면
+ * (ownerParticipantId, visitorParticipantId) 유니크 제약으로 덮어쓴다 —
+ * 방문할 때마다 새 행이 쌓이지 않는다.
+ */
+export const referralVisits = pgTable("referral_visits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  referralLinkId: uuid("referral_link_id")
+    .notNull()
+    .references(() => referralLinks.id, { onDelete: "cascade" }),
+  visitorParticipantId: uuid("visitor_participant_id")
+    .notNull()
+    .references(() => participants.id, { onDelete: "cascade" }),
+  nickname: text("nickname"),
+  status: text("status", { enum: ["connected", "unreachable"] }).notNull(),
+  distance: integer("distance"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  visitorUnique: uniqueIndex("referral_visits_link_visitor_key").on(
+    table.referralLinkId,
+    table.visitorParticipantId,
+  ),
 }));
 
 /** 두 참여자가 모두 참여를 완료했을 때 계산되는 최단 거리 결과. */

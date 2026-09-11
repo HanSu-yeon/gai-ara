@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { visitReferralLink } from "@/lib/referral-links";
+import { getReferralLinkNickname } from "@/lib/referral-links";
 import { isBackendConfigured } from "@/lib/env";
 
 /**
- * 소개 링크 방문 — nickname만 돌려주고 방문 횟수를 1 늘린다. 누가
- * 방문했는지는 전혀 기록하지 않는다(익명 카운트만). 소유자 신원(해시,
- * participant id)은 절대 응답에 포함하지 않는다.
+ * 소개 링크 방문 — nickname만 돌려준다. 소유자 신원(해시, participant id)은
+ * 절대 응답에 포함하지 않는다.
  */
 export async function GET(
   _request: Request,
@@ -16,7 +15,7 @@ export async function GET(
   }
 
   const { token } = await params;
-  const result = await visitReferralLink(token);
+  const result = await getReferralLinkNickname(token);
 
   if (!result) {
     return NextResponse.json({ error: "존재하지 않는 링크예요." }, { status: 404 });

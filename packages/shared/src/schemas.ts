@@ -77,10 +77,18 @@ export const createReferralLinkSchema = z.object({
 });
 export type CreateReferralLinkInput = z.infer<typeof createReferralLinkSchema>;
 
+/** owner가 자기 링크로 들어온 방문자 한 명과의 결과를 다시 볼 때. */
+export const referralVisitSchema = z.object({
+  nickname: z.string().nullable(),
+  status: z.enum(["connected", "unreachable"]),
+  distance: z.number().int().nonnegative().nullable(),
+});
+export type ReferralVisit = z.infer<typeof referralVisitSchema>;
+
 export const referralLinkSchema = z.object({
   token: z.string(),
   nickname: z.string().nullable(),
-  visitCount: z.number().int().nonnegative(),
+  visits: z.array(referralVisitSchema),
 });
 export type ReferralLink = z.infer<typeof referralLinkSchema>;
 
@@ -91,10 +99,18 @@ export const referralLandingSchema = z.object({
 export type ReferralLanding = z.infer<typeof referralLandingSchema>;
 
 /**
- * `GET /api/r/{token}/result` 응답 — 현재 세션(방문자)과 링크 owner 사이의
- * 거리. "self"는 owner 본인이 자기 링크를 열었을 때. owner에게는 이
- * 결과가 저장되지 않는다 — 오직 지금 요청한 visitor에게만 그 자리에서
- * 계산해 보여준다.
+ * `POST /api/r/{token}/result` 요청 — nickname은 방문자가 owner에게
+ * 자신을 표시하고 싶을 때만 선택적으로 보낸다.
+ */
+export const referralResultRequestSchema = z.object({
+  nickname: z.string().max(20).optional(),
+});
+export type ReferralResultRequest = z.infer<typeof referralResultRequestSchema>;
+
+/**
+ * `POST /api/r/{token}/result` 응답 — 현재 세션(방문자)과 링크 owner 사이의
+ * 거리. "self"는 owner 본인이 자기 링크를 열었을 때(이 경우는 기록하지
+ * 않는다). 그 외에는 owner가 나중에 다시 볼 수 있도록 남는다.
  */
 export const referralResultSchema = z.object({
   status: z.enum(["connected", "unreachable", "self"]),
