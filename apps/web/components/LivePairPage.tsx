@@ -133,7 +133,7 @@ export default function LivePairPage() {
       </p>
       {hasSession && !wantsReupload ? (
         <>
-          <p className="subtitle">이미 참여하셨네요 — 이 정보로 바로 확인할까요?</p>
+          <p className="subtitle">이미 참여하셨네요. 이 정보로 바로 확인할까요?</p>
           <button type="button" className="primary-button mt-4" onClick={handleQuickConfirm} disabled={confirming}>
             {confirming ? "확인하는 중…" : "바로 확인하기"}
           </button>

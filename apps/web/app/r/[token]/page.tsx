@@ -11,7 +11,7 @@ export async function generateMetadata(
   const { token } = await params;
   const link = isBackendConfigured() ? await getReferralLinkNickname(token) : null;
 
-  const title = link?.nickname ? `${link.nickname}님이 초대했어요 — 가이 알아?` : "친구가 초대했어요 — 가이 알아?";
+  const title = link?.nickname ? `${link.nickname}님이 초대했어요 · 가이 알아?` : "친구가 초대했어요 · 가이 알아?";
   const description = "우리, 몇 다리 건너 아는 사이일까? 지금 확인해봐요.";
 
   return {

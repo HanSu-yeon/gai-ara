@@ -11,7 +11,7 @@ export async function generateMetadata(
   const { token } = await params;
   const invite = isBackendConfigured() ? await getInviteByToken(token) : null;
 
-  const title = invite?.inviterNickname ? `${invite.inviterNickname}님이 궁금해해요 — 가이 알아?` : "친구가 궁금해해요 — 가이 알아?";
+  const title = invite?.inviterNickname ? `${invite.inviterNickname}님이 궁금해해요 · 가이 알아?` : "친구가 궁금해해요 · 가이 알아?";
   const description = "나랑 몇 다리 건너 아는 사이인지 확인해봐요.";
 
   return {

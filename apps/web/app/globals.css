@@ -100,7 +100,6 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .result-page .subtitle,
 .result-page .username-input,
 .result-page .result-note,
-.result-page .text-link,
 .result-page h2 {
   font-family:var(--font-rounded), var(--font-sans);
   font-weight:400;
@@ -186,7 +185,7 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .unreachable-invite > svg:first-child { width:32px; height:32px; }
 .unreachable-invite > span { text-align:left; font-size:21px; }
 .unreachable-invite small { display:block; font-family:var(--font-sans); font-size:12px; font-weight:500; margin-bottom:2px; }
-.unreachable-invite > svg:last-child { margin-left:auto; width:20px; }
+.unreachable-invite > svg:last-child { margin-left:auto; width:20px; height:20px; flex-shrink:0; }
 .unreachable-share { display:flex; justify-content:center; align-items:center; gap:12px; width:84%; margin:18px auto 0; min-height:49px; padding:12px; border:1px solid #ede9df; border-radius:99px; background:#faf8f2; color:#71777a; font-size:16px; font-weight:700; }
 .unreachable-share:disabled { opacity:.6; cursor:wait; }
 .unreachable-share:hover { background:#f1eee5; }

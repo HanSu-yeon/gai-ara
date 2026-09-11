@@ -106,11 +106,9 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
       <Character kind="heart" className="result-character" />
       {referralLink ? <>
         <div className="invite-box"><input aria-label="내 링크" value={`${typeof window !== "undefined" ? window.location.origin : ""}/r/${referralLink.token}`} readOnly onFocus={(event) => event.target.select()} /><button onClick={handleCopyReferralLink}>{referralCopied ? "복사했어요!" : "내 링크 복사하기"}</button></div>
-        {referralLink.visits.length > 0 && (
-          <Link href="/connections" className="text-link text-xs mt-3">
-            내 링크로 만난 사람 {referralLink.visits.length}명 보기 →
-          </Link>
-        )}
+        <Link href="/connections" className="text-link text-xs mt-3">
+          {referralLink.visits.length > 0 ? `내 링크로 만난 사람 ${referralLink.visits.length}명 보기` : "내 연결 목록 보기"} →
+        </Link>
       </> : <>
         <input className="username-input mb-3" value={referralNickname} onChange={(event) => setReferralNickname(event.target.value)}
           placeholder="내 닉네임 (선택, 방문자에게 보여요)" maxLength={20} aria-label="내 링크 닉네임" />
@@ -122,11 +120,9 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
         <div className="flex items-center justify-between"><h2 className="font-bold text-deep-green">내 연결 결과</h2><button type="button" className="text-link text-xs" onClick={handleRefresh} disabled={refreshing}>{refreshing ? "확인 중…" : "다시 확인하기"}</button></div>
         <div className="result-counts"><BigNumberCard label="직접 연결" value={result.distanceCounts.direct} /><BigNumberCard label="2다리 안" value={result.distanceCounts.within2} /><BigNumberCard label="3다리 안" value={result.distanceCounts.within3} /></div>
         {result.distanceCounts.direct === 0 && <p className="result-note">아직 가이 알아?에서 확인된 연결이 없어요. 친구를 초대하면 첫 연결이 생겨요!</p>}
-        <button type="button" className="text-link text-xs mt-4" onClick={handleCopyRecoveryLink}>
-          {recoveryCopied ? "복사했어요!" : "내 결과 저장 링크 복사하기"}
-        </button>
+        <p className="result-note mt-4">이 링크를 저장해두면 다른 기기나 브라우저에서도 내 결과를 다시 볼 수 있어요.</p>
+        <div className="invite-box"><input aria-label="내 결과 저장 링크" value={`${typeof window !== "undefined" ? window.location.origin : ""}/result/${result.recoveryToken}`} readOnly onFocus={(event) => event.target.select()} /><button onClick={handleCopyRecoveryLink}>{recoveryCopied ? "복사했어요!" : "복사하기"}</button></div>
         {recoveryError && <p className="error-message" role="alert">{recoveryError}</p>}
-        <p className="result-note">이 링크를 저장해두면 다른 기기나 브라우저에서도 내 결과를 다시 볼 수 있어요.</p>
       </section>
 </>}
   </main>;

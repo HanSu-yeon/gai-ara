@@ -12,7 +12,7 @@ export function UnreachableResult() {
   async function shareResult() {
     setSharing(true);
     setMessage("");
-    const text = "가이 알아? 아직 이어지는 길을 못 찾았어요. 지금 참여한 사람들 사이에서는 둘을 잇는 연결이 아직 없어요.";
+    const text = `가이 알아? 아직 이어지는 길을 못 찾았어요. 지금 참여한 사람들 사이에서는 둘을 잇는 연결이 아직 없어요. ${window.location.origin} 에서 확인해보세요!`;
     try {
       if (navigator.share) {
         await navigator.share({ title: "가이 알아? 연결 결과", text });
@@ -51,7 +51,7 @@ export function UnreachableResult() {
       </div>
       <Link href="/result" className="primary-button unreachable-invite">
         <Icon name="link" />
-        <span><small>다른 사람에게도 보내볼까요?</small>링크 보내기</span>
+        <span><small>다른 사람에게도 보내볼까요?</small>내 링크 확인하기</span>
         <Icon name="arrow" />
       </Link>
       <button className="unreachable-share" onClick={shareResult} disabled={sharing}>
