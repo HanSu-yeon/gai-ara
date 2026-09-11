@@ -8,3 +8,5 @@ coverage/
 .env.local
 .DS_Store
 .turbo/
+.neon
+.mcp.json
