@@ -125,6 +125,7 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
             {referralLink.nickname ? `닉네임 "${referralLink.nickname}" 수정` : "닉네임 설정하기"}
           </button>
         )}
+        <br />
         <Link href="/connections" className="text-link text-xs mt-3">
           {referralLink.visits.length > 0 ? `내 링크로 만난 사람 ${referralLink.visits.length}명 보기` : "내 연결 목록 보기"} →
         </Link>
