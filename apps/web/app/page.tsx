@@ -19,7 +19,7 @@ export default function LandingPage() {
       <div><span className="feature-icon peach"><Icon name="share" /></span><p>참여할수록 커지는<strong>네트워크</strong></p></div>
       <div><span className="feature-icon"><Icon name="link" /></span><p>링크 하나로<strong>우리 사이 확인</strong></p></div>
     </section>
-    <section id="about" className="about-card"><Character kind="search" /><div><span className="handwritten">가이 알아?</span><p>제주는 생각보다 더 촘촘하게<br />연결되어 있을지 몰라요.</p></div></section>
-    <details className="how-it-works"><summary><span>⌄</span>어떻게 진행되나요?</summary><ol><li>인스타에서 팔로워·팔로잉 데이터를 받아요.</li><li>ZIP 파일을 가져오면 연결을 분석해요.</li><li>친구에게 링크를 보내 몇 다리인지 확인해요.</li></ol><Link href="/upload" className="text-link">시작하기 →</Link></details>
+    <section id="about" className="about-card"><Character kind="search" /><div><span className="handwritten">가이 알아?</span><p>친구의 친구를 따라가다 보면<br />생각보다 가까운 사이일지도 몰라요.</p></div></section>
+    <Link href="/upload/guide" className="guide-button">데이터 받는 법 보기 <Icon name="arrow" /></Link>
   </main>;
 }
