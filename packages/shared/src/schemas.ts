@@ -66,3 +66,38 @@ export const myPairsResponseSchema = z.object({
   pairs: z.array(myPairSummarySchema),
 });
 export type MyPairsResponse = z.infer<typeof myPairsResponseSchema>;
+
+/**
+ * 재사용 가능한 "내 소개 링크" 생성/조회 요청. `pair_invites`와 달리 특정
+ * 상대를 지정하지 않는다 — 참여자당 하나만 있고 여러 사람이 같은 링크로
+ * 들어올 수 있다.
+ */
+export const createReferralLinkSchema = z.object({
+  nickname: z.string().max(20).optional(),
+});
+export type CreateReferralLinkInput = z.infer<typeof createReferralLinkSchema>;
+
+export const referralLinkSchema = z.object({
+  token: z.string(),
+  nickname: z.string().nullable(),
+  visitCount: z.number().int().nonnegative(),
+});
+export type ReferralLink = z.infer<typeof referralLinkSchema>;
+
+/** `GET /api/r/{token}` 응답 — 방문자에게 보여줄 최소 정보만. */
+export const referralLandingSchema = z.object({
+  nickname: z.string().nullable(),
+});
+export type ReferralLanding = z.infer<typeof referralLandingSchema>;
+
+/**
+ * `GET /api/r/{token}/result` 응답 — 현재 세션(방문자)과 링크 owner 사이의
+ * 거리. "self"는 owner 본인이 자기 링크를 열었을 때. owner에게는 이
+ * 결과가 저장되지 않는다 — 오직 지금 요청한 visitor에게만 그 자리에서
+ * 계산해 보여준다.
+ */
+export const referralResultSchema = z.object({
+  status: z.enum(["connected", "unreachable", "self"]),
+  distance: z.number().int().nonnegative().nullable(),
+});
+export type ReferralResult = z.infer<typeof referralResultSchema>;

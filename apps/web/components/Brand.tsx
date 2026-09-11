@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { type ReactNode } from "react";
 
 export function Icon({ name, className = "" }: { name: "arrow" | "back" | "lock" | "instagram" | "share" | "upload" | "link"; className?: string }) {
   const paths = { arrow: "M5 12h14m-6-6 6 6-6 6", back: "m14 5-7 7 7 7", lock: "M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5zM12 14v3", instagram: "M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm9 9a4 4 0 1 1-8 0 4 4 0 0 1 8 0M17 7h.01", share: "m8 11 8-5M8 13l8 5M8 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0m12-7a2 2 0 1 1-4 0 2 2 0 0 1 4 0m0 14a2 2 0 1 1-4 0 2 2 0 0 1 4 0", upload: "M12 16V3m-5 5 5-5 5 5M5 11H3v10h18V11h-2", link: "m10 14 4-4m-6 2-2 2a4 4 0 0 0 6 6l3-3a4 4 0 0 0 0-6m1 1 2-2a4 4 0 0 0-6-6L9 7a4 4 0 0 0 0 6" };
@@ -15,6 +16,28 @@ export function Steps({ active }: { active: number }) {
   return <ol className="steps">{["파일 업로드", "분석 중", "결과 확인"].map((label, i) => <li key={label} className={active === i ? "active" : ""} aria-current={active === i ? "step" : undefined}><span>{i + 1}</span>{label}</li>)}</ol>;
 }
 export function PrivacyNote() { return <div className="privacy-note"><Icon name="lock" /><div><strong>연결 계산에 필요한 정보만 사용해요.</strong></div></div>; }
+
+/** pair 결과·소개 링크 결과처럼 "가운데 정렬 + 캐릭터 + 상태 텍스트" 화면에서 공용으로 쓴다. */
+export function Centered({
+  children,
+  character = "heart",
+}: {
+  children: ReactNode;
+  character?: "wave" | "search" | "heart" | "default" | "curious";
+}) {
+  return (
+    <main className="brand-page">
+      <BrandHeader home />
+      <Character kind={character} className="result-character" />
+      <div className="space-y-4">{children}</div>
+    </main>
+  );
+}
+
+/** Centered 안에 들어가는 상태 문구 — 일반 텍스트가 아니라 pair-status-message 스타일을 쓴다. */
+export function StatusMessage({ children }: { children: ReactNode }) {
+  return <p className="pair-status-message">{children}</p>;
+}
 
 export function ConnectionSearchArt() {
   return <div className="connection-search-art" role="img" aria-label="돋보기를 든 귤이 사람들 사이의 연결을 찾는 모습">

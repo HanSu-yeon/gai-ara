@@ -1,34 +1,14 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import type { PairResult } from "@gai-ara/shared";
 import { UploadFlow } from "@/components/UploadFlow";
-import { BrandHeader, Character } from "@/components/Brand";
+import { BrandHeader, Character, Centered, StatusMessage } from "@/components/Brand";
 import { UnreachableResult } from "@/components/UnreachableResult";
 import { formatConnectionPhrase } from "@/lib/distance-copy";
 
 type InviteStatus = "pending" | "accepted" | "expired" | "not-found";
-
-function Centered({
-  children,
-  character = "heart",
-}: {
-  children: ReactNode;
-  character?: "wave" | "search" | "heart" | "default" | "curious";
-}) {
-  return (
-    <main className="brand-page">
-      <BrandHeader home />
-      <Character kind={character} className="result-character" />
-      <div className="space-y-4">{children}</div>
-    </main>
-  );
-}
-
-function StatusMessage({ children }: { children: ReactNode }) {
-  return <p className="pair-status-message">{children}</p>;
-}
 
 export default function LivePairPage() {
   const params = useParams<{ token: string }>();

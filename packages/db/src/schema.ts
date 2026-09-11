@@ -96,6 +96,29 @@ export const pairInvites = pgTable("pair_invites", {
   tokenUnique: uniqueIndex("pair_invites_token_key").on(table.token),
 }));
 
+/**
+ * 재사용 가능한 "내 소개 링크" — `pair_invites`와 달리 특정 상대 한 명을
+ * 지정하지 않는다. 참여자당 하나만 있고(최초 요청 시 upsert), 여러 사람이
+ * 같은 링크로 들어와 각자 `/upload`로 참여할 수 있다. 특정 페어를 만들지
+ * 않으므로 이 표에는 "누가 들어왔는지"를 전혀 기록하지 않는다 —
+ * `visitCount`만 익명으로 증가시킨다. 실제로 서로 맞팔이면 각자 업로드를
+ * 마친 뒤 그래프에서 자동으로 연결이 잡힌다(별도 매칭 로직 불필요).
+ */
+export const referralLinks = pgTable("referral_links", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ownerParticipantId: uuid("owner_participant_id")
+    .notNull()
+    .references(() => participants.id, { onDelete: "cascade" }),
+  token: text("token").notNull(),
+  /** pair_invites의 inviterNickname과 같은 개념 — 방문자에게 그대로 보여준다. */
+  nickname: text("nickname"),
+  visitCount: integer("visit_count").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tokenUnique: uniqueIndex("referral_links_token_key").on(table.token),
+  ownerUnique: uniqueIndex("referral_links_owner_key").on(table.ownerParticipantId),
+}));
+
 /** 두 참여자가 모두 참여를 완료했을 때 계산되는 최단 거리 결과. */
 export const pairResults = pgTable("pair_results", {
   id: uuid("id").defaultRandom().primaryKey(),

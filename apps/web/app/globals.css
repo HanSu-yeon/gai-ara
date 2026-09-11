@@ -96,6 +96,15 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .subtitle { letter-spacing:-.035em; line-height:1.8; }
 .handwritten { font-size:15px; }
 .speech { font-size:12px; line-height:1.5; }
+.result-page .subtitle,
+.result-page .username-input,
+.result-page .result-note,
+.result-page .text-link,
+.result-page h2 {
+  font-family:var(--font-rounded), var(--font-sans);
+  font-weight:400;
+  font-synthesis:none;
+}
 
 .walkthrough-file { width:100%; cursor:pointer; }
 .selected-file { display:flex; align-items:center; gap:12px; padding:18px 14px; border:1px solid #d7dfce; border-radius:15px; background:#f2f5eb; text-align:left; color:#18563a; }
