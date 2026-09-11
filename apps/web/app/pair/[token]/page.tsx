@@ -1,3 +1,3 @@
-import { WalkthroughPair } from "@/components/Walkthrough";
+import LivePairPage from "@/components/LivePairPage";
 
-export default function PairPage() { return <WalkthroughPair />; }
+export default function PairPage() { return <LivePairPage />; }

@@ -5,17 +5,29 @@ import { useParams } from "next/navigation";
 import type { PairResult } from "@gai-ara/shared";
 import { UploadFlow } from "@/components/UploadFlow";
 import { BrandHeader, Character } from "@/components/Brand";
+import { UnreachableResult } from "@/components/UnreachableResult";
+import { formatConnectionPhrase } from "@/lib/distance-copy";
 
 type InviteStatus = "pending" | "accepted" | "expired" | "not-found";
 
-function Centered({ children }: { children: ReactNode }) {
+function Centered({
+  children,
+  character = "heart",
+}: {
+  children: ReactNode;
+  character?: "wave" | "search" | "heart" | "default" | "curious";
+}) {
   return (
     <main className="brand-page">
       <BrandHeader home />
-      <Character kind="heart" className="result-character" />
+      <Character kind={character} className="result-character" />
       <div className="space-y-4">{children}</div>
     </main>
   );
+}
+
+function StatusMessage({ children }: { children: ReactNode }) {
+  return <p className="pair-status-message">{children}</p>;
 }
 
 export default function LivePairPage() {
@@ -23,7 +35,19 @@ export default function LivePairPage() {
   const token = params.token;
 
   const [inviteStatus, setInviteStatus] = useState<InviteStatus | null>(null);
+  const [inviterNickname, setInviterNickname] = useState<string | null>(null);
   const [pairResult, setPairResult] = useState<PairResult | null>(null);
+  const [hasSession, setHasSession] = useState(false);
+  const [wantsReupload, setWantsReupload] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/session")
+      .then(async (response) => (response.ok ? ((await response.json()) as { active: boolean }).active : false))
+      .then(setHasSession)
+      .catch(() => setHasSession(false));
+  }, []);
 
   useEffect(() => {
     fetch(`/api/invites/${token}`)
@@ -32,14 +56,34 @@ export default function LivePairPage() {
           setInviteStatus("not-found");
           return;
         }
-        const data = (await response.json()) as { status: InviteStatus };
+        const data = (await response.json()) as { status: InviteStatus; inviterNickname?: string | null };
         setInviteStatus(data.status);
+        setInviterNickname(data.inviterNickname ?? null);
+
+        // 이미 accepted된 링크를 다시 열었을 때(새로고침, 재방문 등)도
+        // 결과를 보여줘야 한다 — accept 직후에만 조회하면 업로드 화면으로
+        // 되돌아가버린다.
+        if (data.status === "accepted") {
+          const resultResponse = await fetch(`/api/pairs/${token}/result`);
+          if (resultResponse.ok) {
+            setPairResult((await resultResponse.json()) as PairResult);
+          }
+        }
       })
       .catch(() => setInviteStatus("not-found"));
   }, [token]);
 
   async function handleUploaded() {
     const accepted = await fetch(`/api/invites/${token}/accept`, { method: "POST" });
+    if (accepted.status === 410) {
+      throw new Error("이 링크는 만료되었어요.");
+    }
+    if (accepted.status === 400) {
+      throw new Error("자기 자신의 링크로는 확인할 수 없어요.");
+    }
+    if (accepted.status === 409) {
+      throw new Error("이 링크는 이미 다른 사람이 사용했어요.");
+    }
     if (!accepted.ok) throw new Error("초대를 수락하지 못했어요. 링크를 다시 확인해주세요.");
     const response = await fetch(`/api/pairs/${token}/result`);
     if (!response.ok) throw new Error("결과를 불러오지 못했어요. 다시 시도해주세요.");
@@ -47,41 +91,51 @@ export default function LivePairPage() {
     setInviteStatus("accepted");
   }
 
+  /**
+   * 이미 세션이 있는(=예전에 한 번 참여한) 사람이 새 초대 링크를 열었을 때
+   * 재업로드 없이 바로 확인하는 지름길. handleUploaded와 로직은 같지만
+   * UploadFlow 밖에서 직접 호출하므로 에러를 여기서 따로 잡아야 한다.
+   */
+  async function handleQuickConfirm() {
+    setConfirming(true);
+    setConfirmError(null);
+    try {
+      await handleUploaded();
+    } catch (err) {
+      setConfirmError(err instanceof Error ? err.message : "확인하지 못했어요. 다시 시도해주세요.");
+    } finally {
+      setConfirming(false);
+    }
+  }
+
   if (inviteStatus === "not-found") {
-    return <Centered>존재하지 않는 링크예요.</Centered>;
+    return <Centered character="search"><StatusMessage>존재하지 않는 링크예요.</StatusMessage></Centered>;
   }
 
   if (inviteStatus === "expired") {
-    return <Centered>이 링크는 만료되었어요.</Centered>;
+    return <Centered character="search"><StatusMessage>이 링크는 만료되었어요.</StatusMessage></Centered>;
   }
 
   if (pairResult) {
+    if (pairResult.status === "unreachable") return <UnreachableResult />;
     return (
-      <Centered>
+      <Centered character={pairResult.status === "connected" ? "wave" : "heart"}>
         {pairResult.status === "connected" && (
           <>
-            <p className="text-lg text-ink/70">우리는</p>
-            <p className="text-6xl font-bold text-tangerine">{pairResult.distance}다리</p>
-            <p className="text-lg text-ink/70">예요!</p>
+            <p className="pair-result-kicker">우리는</p>
+            <p className="pair-result-title">{formatConnectionPhrase(pairResult.distance ?? 1)}</p>
+            <p className="pair-result-kicker">예요!</p>
           </>
         )}
-        {pairResult.status === "unreachable" && (
-          <p className="text-ink/70">
-            아직 참여자 그래프 안에서 서로 연결된 경로를 찾지 못했어요.
-          </p>
-        )}
         {pairResult.status === "pending" && (
-          <p className="text-ink/70">상대방의 참여를 기다리고 있어요.</p>
+          <StatusMessage>상대방의 참여를 기다리고 있어요.</StatusMessage>
         )}
-        <p className="max-w-xs text-xs text-ink/40">
-          누가 누구를 아는지는 보여주지 않아요. 몇 다리인지만 계산해요.
-        </p>
       </Centered>
     );
   }
 
   if (inviteStatus === null) {
-    return <Centered>불러오는 중...</Centered>;
+    return <Centered character="search"><StatusMessage>불러오는 중…</StatusMessage></Centered>;
   }
 
   return (
@@ -89,12 +143,25 @@ export default function LivePairPage() {
       <BrandHeader back />
       <Character kind="wave" className="result-character" />
       <h1 className="upload-heading">
-        친구가 당신과 몇 다리인지 궁금해해요
+        {inviterNickname ? <>{inviterNickname}님이 당신과<br />몇 다리인지 궁금해해요</> : "친구가 당신과 몇 다리인지 궁금해해요"}
       </h1>
       <p className="subtitle mb-6">
-        누가 물어봤는지는 알려주지 않아요. 나도 참여하면 둘이 몇 다리인지 함께 볼 수 있어요.
+        나도 참여하면 둘이 몇 다리인지 함께 볼 수 있어요.
       </p>
-      <UploadFlow onUploaded={handleUploaded} />
+      {hasSession && !wantsReupload ? (
+        <>
+          <p className="subtitle">이미 참여하셨네요 — 이 정보로 바로 확인할까요?</p>
+          <button type="button" className="primary-button mt-4" onClick={handleQuickConfirm} disabled={confirming}>
+            {confirming ? "확인하는 중…" : "바로 확인하기"}
+          </button>
+          {confirmError && <p className="error-message" role="alert">{confirmError}</p>}
+          <button type="button" className="text-link text-xs mt-4" onClick={() => setWantsReupload(true)}>
+            다른 파일로 다시 올릴래요
+          </button>
+        </>
+      ) : (
+        <UploadFlow onUploaded={handleUploaded} />
+      )}
     </main>
   );
 }

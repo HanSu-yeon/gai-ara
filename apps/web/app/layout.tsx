@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import Script from "next/script";
 import "./globals.css";
 
 const jalnan = localFont({
@@ -13,6 +14,7 @@ const jalnan = localFont({
 const SITE_URL = "https://gai-ara-rouge.vercel.app";
 const SHARE_TITLE = "가이 알아? 우리, 생각보다 가까울지도 🍊";
 const SHARE_DESCRIPTION = "나랑 얼마나 가까운 사이인지 확인해봐요.";
+const GA_MEASUREMENT_ID = "G-VDR05ET2TB";
 
 export const metadata: Metadata = {
   // TODO: 커스텀 도메인을 연결하면 이 값을 그 도메인으로 바꾼다.
@@ -52,6 +54,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html data-scroll-behavior="smooth" lang="ko" className={jalnan.variable}>
       <body className="min-h-screen">
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){window.dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GA_MEASUREMENT_ID}');
+          `}
+        </Script>
         <div className="brand-shell">{children}</div>
       </body>
     </html>

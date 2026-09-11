@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Character, ConnectionSearchArt, Icon, PrivacyNote, Steps } from "@/components/Brand";
-import { InstagramExportParseError, parseMutualsFromZip, suggestUsernameFromFilename } from "@gai-ara/ig-parser";
+import { InstagramExportParseError, parseFollowingFromZip, suggestUsernameFromFilename } from "@gai-ara/ig-parser";
 
 type Status = "idle" | "parsing" | "uploading" | "error";
 
@@ -12,8 +12,9 @@ interface UploadFlowProps {
 
 /**
  * ZIP 파싱은 전부 브라우저에서 일어난다 (@gai-ara/ig-parser).
- * 서버로는 정규화된 "내 아이디"와 맞팔 목록만 전송하고,
- * 원본 followers/following 전체 목록이나 ZIP 파일 자체는 보내지 않는다.
+ * 서버로는 정규화된 "내 아이디"와 내가 팔로우하는 사람 목록만 전송한다.
+ * followers는 아예 받지 않는다 — 맞팔 여부는 서버가 두 참여자의 following을
+ * 대조해서 판정한다.
  */
 export function UploadFlow({ onUploaded }: UploadFlowProps) {
   const [selfUsername, setSelfUsername] = useState("");
@@ -37,13 +38,13 @@ export function UploadFlow({ onUploaded }: UploadFlowProps) {
 
     try {
       setStatus("parsing");
-      const mutualUsernames = await parseMutualsFromZip(file);
+      const followingUsernames = await parseFollowingFromZip(file, selfUsername);
 
       setStatus("uploading");
       const response = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selfUsername, mutualUsernames }),
+        body: JSON.stringify({ selfUsername, followingUsernames }),
       });
 
       if (!response.ok) {
@@ -84,7 +85,7 @@ export function UploadFlow({ onUploaded }: UploadFlowProps) {
     <ConnectionSearchArt />
     <p className="subtitle">조금만 기다려주세요.<br />몇 다리 건너 연결되어 있을까요?</p>
     <div className="progress-track" />
-    <p className="status-caption">{status === "parsing" ? "파일에서 맞팔 관계를 확인하고 있어요…" : "연결을 분석하고 있어요…"}</p>
+    <p className="status-caption">{status === "parsing" ? "파일에서 팔로잉 목록을 확인하고 있어요…" : "연결을 분석하고 있어요…"}</p>
   </section>;
 
   return (

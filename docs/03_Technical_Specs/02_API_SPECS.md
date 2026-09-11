@@ -1,6 +1,6 @@
 # API Specs: ZIP 파싱 계약 및 초대/Consent 플로우
 > Created: 2026-09-10 22:30
-> Last Updated: 2026-09-10 22:30
+> Last Updated: 2026-09-12 02:00
 
 이 문서는 두 가지를 다룬다: (1) Instagram ZIP을 브라우저에서 안전하게 파싱하는 방법과
 서버가 실제로 받는 데이터의 계약, (2) "우리 몇다리?" 초대 링크와 consent 플로우의
@@ -12,7 +12,12 @@
 우선한다.
 
 - 원본 ZIP 파일. 어떤 엔드포인트도 `multipart/form-data` 파일 업로드를 받지 않는다.
-- followers/following 원본 전체 목록. 클라이언트가 계산한 mutual 교집합만 받는다.
+- followers 데이터 자체. 이 서비스는 following만 요청한다 — 맞팔 여부는
+  서버가 두 참여자의 following을 대조해서 판정하므로 "누가 나를 팔로우하는가"는
+  애초에 필요 없다([01_DB_SCHEMA.md §4](./01_DB_SCHEMA.md#4-mutual-follow-그래프-저장-구조)).
+- following 원본 전체 목록의 서버 측 가공. 클라이언트가 정규화·중복 제거한
+  following 목록을 그대로 받되, 맞팔(mutual) 판정 자체는 클라이언트가 하지
+  않는다 — 서버가 참여자들의 following을 대조해서 판정한다.
 - 임의의 username에 대한 해시값이나 "이 사람이 참여자인지"를 알려주는 조회 API.
   이런 API가 있으면 사실상 계정 검색 기능이 되어 기획서 6장의 원칙을 API 레벨에서
   깨뜨린다.
@@ -22,15 +27,15 @@
 
 ### 2.1 원칙
 
-ZIP은 전부 브라우저에서 열어보고, 계산이 끝난 mutual username 목록만 서버로
-보낸다. 서버는 이 세션에서 이 사람의 ZIP을 본 적이 없다.
+ZIP은 전부 브라우저에서 열어보고, following username 목록만 서버로 보낸다.
+서버는 이 세션에서 이 사람의 ZIP을 본 적이 없다.
 
 ### 2.2 안전하게 파싱하기 위한 구체 규칙
 
 | 위험 | 대응 |
 | :--- | :--- |
-| Zip bomb (압축 해제 시 비정상적으로 큰 크기) | 대상 파일(followers_*.json, following.json)의 압축 해제 전 크기를 확인하고, 합계가 임계치(예: 100MB)를 넘으면 해제를 거부하고 안내 메시지를 표시한다. |
-| 무관한 대용량 콘텐츠(사진/영상/DM) 압축 해제 | 파일명 패턴(`followers*.json`, `following.json`)에 매칭되는 항목만 압축 해제한다. ZIP 라이브러리는 항목 목록을 먼저 읽고 개별 항목 단위로 지연 압축 해제하므로, 매칭되지 않는 파일은 애초에 해제되지 않는다. |
+| Zip bomb (압축 해제 시 비정상적으로 큰 크기) | 대상 파일(`following.json`)의 압축 해제 전 크기를 확인하고, 임계치(예: 100MB)를 넘으면 해제를 거부하고 안내 메시지를 표시한다. |
+| 무관한 대용량 콘텐츠(사진/영상/DM) 압축 해제 | 파일명 패턴(`following.json`)에 매칭되는 항목만 압축 해제한다. ZIP 라이브러리는 항목 목록을 먼저 읽고 개별 항목 단위로 지연 압축 해제하므로, 매칭되지 않는 파일은 애초에 해제되지 않는다. |
 | 손상되었거나 형식이 다른 JSON | `JSON.parse` 실패 시 해당 파일만 건너뛰고 나머지는 계속 처리한다. 전체 실패로 처리하지 않는다. |
 | ZIP 내부 HTML/미디어 파일을 통한 콘텐츠 주입 | Instagram export에는 메시지 스레드 등 HTML 파일도 포함될 수 있다. 이런 파일은 애초에 매칭 패턴에 걸리지 않으므로 열어보지 않으며, 그 어떤 파일 내용도 `innerHTML`이나 스크립트 실행 경로로 넘기지 않는다 — 오직 `JSON.parse`만 호출한다. |
 | Export 구조 변경(파일명, JSON 스키마) | 특정 JSON 스키마 하나에 고정하지 않고, JSON 트리를 재귀 탐색해 `string_list_data[].value` 형태의 문자열을 모두 수집하는 방식으로 구조 변화에 견고하게 만든다. |
@@ -39,17 +44,18 @@ ZIP은 전부 브라우저에서 열어보고, 계산이 끝난 mutual username 
 
 ### 2.3 클라이언트 → 서버 데이터 계약
 
-브라우저에서 계산이 끝난 뒤 서버로 넘어오는 값은 다음 하나뿐이다.
+브라우저에서 파싱이 끝난 뒤 서버로 넘어오는 값은 다음 하나뿐이다.
 
 ```ts
-type UploadMutualsRequest = {
-  selfUsername: string;        // 사용자가 직접 입력 (§ DB_SCHEMA 3.5)
-  mutualUsernames: string[];   // followers ∩ following, 이미 정규화됨
+type UploadFollowingRequest = {
+  selfUsername: string;         // 사용자가 직접 입력 (§ DB_SCHEMA 3.5)
+  followingUsernames: string[]; // following.json에서 추출, 정규화·중복 제거·자기 자신 제외 완료
 };
 ```
 
-원본 followers/following 전체 목록, ZIP 파일, 업로드 시각 외의 메타데이터는
-포함하지 않는다.
+맞팔(mutual) 여부는 여기 담기지 않는다 — 서버가 이 following 목록을 다른
+참여자들의 following과 대조해서 판정한다([01_DB_SCHEMA.md §4](./01_DB_SCHEMA.md#4-mutual-follow-그래프-저장-구조)).
+followers 원본, ZIP 파일, 업로드 시각 외의 메타데이터는 포함하지 않는다.
 
 ## 3. 초대/Consent 플로우
 
@@ -103,9 +109,12 @@ B, 링크(/pair/{token}) 오픈
 #### `POST /api/upload`
 
 - **인증**: 없음(최초 참여) 또는 기존 세션(재참여/업데이트).
-- **요청**: `UploadMutualsRequest` (§2.3).
-- **동작**: `selfUsername`을 해싱해 참여자 upsert(`has_uploaded_own_data = true`),
-  각 mutual을 해싱해 고스트 참여자 upsert, 둘 사이 edge 생성, 세션 쿠키 발급/갱신.
+- **요청**: `UploadFollowingRequest` (§2.3).
+- **동작**: `selfUsername`을 해싱해 참여자 upsert. `followingUsernames`는 각각
+  해싱해서 `follows`에 "이 참여자 → 그 해시" 방향 행으로 동기화(재업로드 시
+  이전 목록과 diff해서 없어진 건 삭제, 새로 생긴 건 추가). 고스트 참여자나
+  edge를 이 시점에 만들지 않는다 — mutual edge는 `GET /api/me/result` 등이
+  조회할 때 양방향 `follows`를 대조해서 그때 판정한다([01_DB_SCHEMA.md §4.2](./01_DB_SCHEMA.md#42-채택안-b-postgresql--participant-only-mutual--요청-시-인메모리-bfs)).
 - **응답**: `{ ok: true }`. 해시값, 상대방 존재 여부 등은 절대 포함하지 않는다.
 - **에러**: 요청 스키마 불일치(400).
 
@@ -116,8 +125,6 @@ B, 링크(/pair/{token}) 오픈
   ```ts
   type MeResult = {
     distanceCounts: { direct: number; within2: number; within3: number };
-    totalParticipants: number;
-    percentileWithin3: number; // 0-100
   };
   ```
 - 그래프 노드/엣지, 중간 연결자는 포함하지 않는다.
@@ -136,14 +143,24 @@ B, 링크(/pair/{token}) 오픈
 #### `POST /api/invites/{token}/accept`
 
 - **인증**: 세션 필수(recipient 본인). 401 if missing.
-- **동작**: `inviter_participant_id === recipient_participant_id`(자기 자신의
-  링크로 접속)이면 상태를 바꾸지 않는다. 이미 accepted/expired면 그대로 반환한다.
-- **응답**: `{ status }`.
+- **동작**: `pair_invites.status = 'pending'` 조건까지 포함한 원자적 UPDATE로
+  recipient를 확정한다(동시 accept race 방지).
+- **에러**: 존재하지 않는 token(404) · 만료된 링크(410) · 자기 자신의 링크로
+  접속(`inviter_participant_id === recipient_participant_id`, 400) · 이미 다른
+  사람이 먼저 accept한 링크(409, recipient가 호출자 자신이 아님). 이 네 경우
+  모두 클라이언트가 성공으로 오해해 결과 조회로 넘어가지 않도록 2xx가 아닌
+  상태 코드로 명확히 구분한다.
+- **응답(성공)**: `{ status }`.
 
 #### `GET /api/pairs/{token}/result`
 
-- **인증**: 없음 — 초대장 자체가 접근 제어의 단위이므로 A/B 누구든 조회 가능.
-  (재검토 여지: 링크가 제3자에게 유출되면 그 사람도 결과를 볼 수 있다 — §4 참고.)
+- **인증**: 세션 필수 — 현재 세션의 participant가 이 초대의
+  `inviter_participant_id` 또는 `recipient_participant_id`일 때만 결과를
+  내려준다(403 otherwise). 토큰을 안다는 사실만으로는 결과를 볼 수 없다 —
+  accepted 링크가 제3자에게 유출/재전달돼도 그 사람은 실제 다리 수를 볼 수
+  없다는 뜻이다. (이전에는 §4에 "재검토 여지"로 남아 있었으나, recipient가
+  세션(쿠키)을 잃으면 자기 결과를 다시 못 본다는 트레이드오프를 감수하고
+  세션 기반 제한 쪽으로 결정했다.)
 - **응답**:
   ```ts
   type PairResult = {
@@ -161,14 +178,13 @@ B, 링크(/pair/{token}) 오픈
 
 ## 4. 미해결 사항 ([TODO])
 
-- **[TODO][Medium]** `GET /api/pairs/{token}/result`를 인증 없이 열어두는 것이
-  맞는지: 링크가 제3자에게 전달되면 그 사람도 결과(정확한 다리 수)를 볼 수 있다.
-  대안은 A/B 세션 중 하나로만 조회를 제한하는 것이지만, 그러면 B가 로그아웃/쿠키
-  분실 시 자기 결과를 다시 볼 수 없다. 제품 판단이 필요하다.
-- **[TODO][Medium]** 레이트 리밋 정책 없음: `/api/upload`(mutual 목록 대량 반복
-  전송), `/api/invites`(초대 대량 생성 후 무차별 배포) 모두 현재 제한이 없다.
-  세션당/‌IP당 요청 빈도와 `/api/upload`의 `mutualUsernames` 최대 개수(현재 2만)
-  조정이 필요하다.
+- **[해결됨]** ~~`GET /api/pairs/{token}/result`를 인증 없이 열어두는 것이 맞는지~~
+  — §3.3에서 세션 기반 제한(inviter/recipient만 조회 가능, 403 otherwise)으로
+  결정했다.
+- **[TODO][Medium]** 레이트 리밋 정책 없음: `/api/upload`(following 목록 대량
+  반복 전송), `/api/invites`(초대 대량 생성 후 무차별 배포) 모두 현재 제한이
+  없다. 세션당/‌IP당 요청 빈도와 `/api/upload`의 `followingUsernames` 최대
+  개수(현재 2만) 조정이 필요하다.
 - **[TODO][Low]** 만료된 초대 재발급 UX: 현재는 새 `POST /api/invites`로 새
   토큰을 발급받는 것 외 별도 처리가 없다.
 

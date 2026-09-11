@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildGraph } from "../src/buildGraph";
 import { bfsDistances, shortestDistance } from "../src/shortestPath";
-import { distanceCountsFrom, percentileWithin3 } from "../src/stats";
+import { distanceCountsFrom } from "../src/stats";
 
 // A - B - C - D   (E는 고립)
 const edges = [
@@ -58,16 +58,5 @@ describe("distanceCountsFrom", () => {
     const counts = distanceCountsFrom(graph, "A");
 
     expect(counts).toEqual({ direct: 1, within2: 2, within3: 3 });
-  });
-});
-
-describe("percentileWithin3", () => {
-  it("rounds to the nearest percent", () => {
-    expect(percentileWithin3(71, 100)).toBe(71);
-    expect(percentileWithin3(1, 3)).toBe(33);
-  });
-
-  it("returns 0 when there are no other participants", () => {
-    expect(percentileWithin3(0, 0)).toBe(0);
   });
 });

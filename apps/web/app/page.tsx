@@ -16,7 +16,7 @@ export default function LandingPage() {
     </section>
     <section className="features" aria-label="서비스 특징">
       <div><span className="feature-icon"><Icon name="instagram" /></span><p>내 인스타 데이터로<strong>간단하게</strong></p></div>
-      <div><span className="feature-icon peach"><Icon name="share" /></span><p>참여할수록 커지는<strong>제주 네트워크</strong></p></div>
+      <div><span className="feature-icon peach"><Icon name="share" /></span><p>참여할수록 커지는<strong>네트워크</strong></p></div>
       <div><span className="feature-icon"><Icon name="link" /></span><p>링크 하나로<strong>우리 사이 확인</strong></p></div>
     </section>
     <section id="about" className="about-card"><Character kind="search" /><div><span className="handwritten">가이 알아?</span><p>제주는 생각보다 더 촘촘하게<br />연결되어 있을지 몰라요.</p></div></section>

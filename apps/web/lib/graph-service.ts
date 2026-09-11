@@ -1,6 +1,6 @@
-import { buildGraph, distanceCountsFrom, percentileWithin3, shortestDistance } from "@gai-ara/graph";
+import { buildGraph, distanceCountsFrom, shortestDistance } from "@gai-ara/graph";
 import type { MeResult, PairResult } from "@gai-ara/shared";
-import { getAllEdges, getParticipantTotalCount } from "./participants";
+import { getAllEdges } from "./participants";
 
 /**
  * MVP 규모(참여자 수천~수만)에서는 매 요청마다 전체 edge를 읽어
@@ -12,14 +12,7 @@ export async function computeMeResult(participantId: string): Promise<MeResult> 
   const graph = buildGraph(edges);
   const counts = distanceCountsFrom(graph, participantId);
 
-  const totalParticipants = await getParticipantTotalCount();
-  const totalExcludingSelf = Math.max(totalParticipants - 1, 0);
-
-  return {
-    distanceCounts: counts,
-    totalParticipants,
-    percentileWithin3: percentileWithin3(counts.within3, totalExcludingSelf),
-  };
+  return { distanceCounts: counts };
 }
 
 export async function computePairResult(

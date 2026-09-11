@@ -1,17 +1,22 @@
 import { z } from "zod";
 
 /**
- * 클라이언트가 ZIP을 파싱해서 계산한 "나의 맞팔 목록"을 서버로 올릴 때 쓰는 payload.
- * 원본 팔로워/팔로잉 전체 목록이 아니라 교집합(mutuals)만 전송한다.
+ * 클라이언트가 ZIP을 파싱해서 얻은 "내가 팔로우하는 사람" 목록을 서버로
+ * 올릴 때 쓰는 payload. followers 원본은 아예 전송하지 않는다 — mutual
+ * 여부는 클라이언트가 판단하지 않고, 서버가 두 참여자의 following을
+ * 대조해서 판정한다([01_DB_SCHEMA.md §4](../../../docs/03_Technical_Specs/01_DB_SCHEMA.md) 참고).
  */
-export const uploadMutualsSchema = z.object({
+export const uploadFollowingSchema = z.object({
   selfUsername: z.string().min(1).max(60),
-  mutualUsernames: z.array(z.string().min(1).max(60)).max(20_000),
+  followingUsernames: z.array(z.string().min(1).max(60)).max(20_000),
 });
-export type UploadMutualsInput = z.infer<typeof uploadMutualsSchema>;
+export type UploadFollowingInput = z.infer<typeof uploadFollowingSchema>;
 
 export const createInviteSchema = z.object({
+  /** inviter 자신만 보는 메모 — recipient에게는 절대 노출되지 않는다. */
   label: z.string().max(40).optional(),
+  /** recipient에게 그대로 보여줄 공개용 이름("OO님이 궁금해해요"). */
+  nickname: z.string().max(20).optional(),
 });
 export type CreateInviteInput = z.infer<typeof createInviteSchema>;
 
@@ -21,8 +26,6 @@ export const meResultSchema = z.object({
     within2: z.number().int().nonnegative(),
     within3: z.number().int().nonnegative(),
   }),
-  totalParticipants: z.number().int().nonnegative(),
-  percentileWithin3: z.number().min(0).max(100),
 });
 export type MeResult = z.infer<typeof meResultSchema>;
 
@@ -31,3 +34,35 @@ export const pairResultSchema = z.object({
   distance: z.number().int().nonnegative().nullable(),
 });
 export type PairResult = z.infer<typeof pairResultSchema>;
+
+/**
+ * `GET /api/invites/{token}` 응답. inviterNickname은 inviter가 직접 공개로
+ * 적은 이름이라 recipient에게 보여줘도 된다 — inviter의 신원(해시, id 등)
+ * 자체는 여기에도 절대 포함하지 않는다.
+ */
+export const inviteStatusSchema = z.object({
+  status: z.enum(["pending", "accepted", "expired", "not-found"]),
+  inviterNickname: z.string().nullable().optional(),
+});
+export type InviteStatusResponse = z.infer<typeof inviteStatusSchema>;
+
+/**
+ * "내 연결 목록" 한 줄. label은 inviter 자신이 남긴 메모라 inviter 쪽
+ * 행에서만 채워진다(recipient 쪽 행은 항상 null) — 상대방 신원은 절대
+ * 포함하지 않는다. inviterNickname은 공개용이라 양쪽 다 받는다.
+ */
+export const myPairSummarySchema = z.object({
+  token: z.string(),
+  role: z.enum(["inviter", "recipient"]),
+  label: z.string().nullable(),
+  inviterNickname: z.string().nullable(),
+  status: z.enum(["pending", "accepted", "expired"]),
+  distance: z.number().int().nonnegative().nullable(),
+  createdAt: z.string(),
+});
+export type MyPairSummary = z.infer<typeof myPairSummarySchema>;
+
+export const myPairsResponseSchema = z.object({
+  pairs: z.array(myPairSummarySchema),
+});
+export type MyPairsResponse = z.infer<typeof myPairsResponseSchema>;

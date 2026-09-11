@@ -1,6 +1,6 @@
 # Development Principles
 > Created: 2026-09-10 22:30
-> Last Updated: 2026-09-10 23:10
+> Last Updated: 2026-09-12 02:00
 
 이 문서는 "가이 알아?"의 기술 스택 선택 이유와, 모든 하위 설계(DB 스키마, API 명세)가
 지켜야 하는 아키텍처 원칙을 정의한다. 이 프로젝트는 개인정보(Instagram 관계 데이터)를
@@ -13,16 +13,16 @@
 | 영역 | 선택 | 상태 |
 | :--- | :--- | :--- |
 | Frontend/Backend | Next.js (App Router) + TypeScript | 확정 |
-| DB | Turso (libSQL, SQLite 호환) | 확정 (2026-09-10 변경, §1.3) |
-| DB 드라이버 | `@libsql/client` + `drizzle-orm/libsql` | 확정 |
+| DB | PostgreSQL | 확정 (2026-09-11 재확정, §1.3) |
+| DB 드라이버 | `postgres` (postgres-js) + `drizzle-orm/postgres-js` | 확정 |
 | ORM | Drizzle ORM | 확정 |
 | ZIP 파싱 | JSZip (브라우저 실행) | 확정 |
 | 검증 | Zod | 확정 |
-| 배포 | Vercel + Turso Cloud | 제안, 미확정 |
+| 배포 | Vercel + 관리형 Postgres(예: Neon) | 제안, 미확정 |
 
-후보로 제시한 Next.js + TypeScript + PostgreSQL 중 DB는 이후 Turso(libSQL)로
-변경했다(§1.3). 나머지는 그대로 채택한다. 아래는 각 선택에서 검토한 대안과
-기각 이유다.
+Next.js + TypeScript + PostgreSQL을 그대로 채택한다. 중간에 Turso(libSQL)로
+바꾸는 걸 검토했다가 다시 PostgreSQL로 되돌린 경위는 §1.3에 남긴다. 아래는 각
+선택에서 검토한 대안과 기각 이유다.
 
 ### 1.2 Frontend/Backend: Next.js (분리하지 않음)
 
@@ -38,38 +38,39 @@
 공개해야 할 때 재검토한다. 이번 기획서(14장)는 명시적으로 네이티브 앱을 MVP 범위에서
 제외했으므로 현재는 해당하지 않는다.
 
-### 1.3 DB: Turso / libSQL (PostgreSQL에서 변경, 그래프 전용 DB는 여전히 사용하지 않음)
+### 1.3 DB: PostgreSQL (Turso/libSQL 검토했다가 되돌림, 그래프 전용 DB는 여전히 사용하지 않음)
 
-**변경 이력**: 최초 후보는 PostgreSQL이었다. 로컬 개발 환경에 Postgres가 없어
-Docker로 띄우는 방안을 임시로 마련했으나, 이 프로젝트는 "가벼운 소셜 실험"
-규모의 MVP이고 별도 DB 서버 프로세스를 로컬에 띄우는 것 자체가 불필요한 마찰이라고
-판단해, 서버 프로세스 없이 파일 하나로 로컬 개발이 되는 **Turso(libSQL, SQLite
-호환)**로 변경했다.
+**변경 이력**: 최초 후보는 PostgreSQL이었다. 한때 "로컬에 Postgres가 없으면
+Docker로 띄워야 하는 마찰"을 이유로 서버 프로세스 없이 파일 하나로 도는
+Turso(libSQL, SQLite 호환)로 바꾸는 걸 검토했었다. 하지만 실제로 `docker-compose.yml`
+로 로컬 Postgres를 띄우고 업로드→초대→페어 결과 전체 플로우를 검증해보니
+그 마찰은 실재하지 않았고(`docker compose up -d` 한 줄이면 끝), 아래 이유로
+PostgreSQL을 그대로 유지하기로 재확정했다.
 
-**검토한 옵션**:
+**PostgreSQL을 유지하는 이유**:
 
-| 옵션 | 방식 | 로컬 개발 | 성숙도 |
-| :--- | :--- | :--- | :--- |
-| PostgreSQL | 별도 서버 프로세스 필요 (Docker 등) | 서버 기동 필요 | 매우 성숙 |
-| `@libsql/client` + `drizzle-orm/libsql` | 로컬은 `file:./local.db`, 배포는 Turso Cloud(`libsql://...` + authToken) | 서버 없음, 파일 하나 | 안정판, Drizzle 공식 문서 경로 |
-| `@tursodatabase/database` | Turso가 Rust로 새로 만든 인프로세스 임베디드 엔진(구 코드명 Limbo) | 서버 없음, Node 프로세스 안에서 직접 구동 | 2026-09 기준 Drizzle 연동 beta |
+1. **이 워크로드는 SQLite/libSQL의 장점을 못 쓴다.** [01_DB_SCHEMA.md §4](./01_DB_SCHEMA.md#4-mutual-follow-그래프-저장-구조)의
+   결론대로 그래프 순회는 DB 안이 아니라 요청마다 애플리케이션 메모리에서
+   BFS로 처리한다. DB는 그냥 `follows` 테이블을 조인해서 읽어오는 용도라,
+   Turso가 강점인 엣지 근접 저지연 읽기 같은 특성이 체감될 지점이 없다.
+2. **마이그레이션 비용 대비 얻는 기능적 이득이 없다.** `schema.ts`(pg-core →
+   sqlite-core), `client.ts`(postgres-js → libsql), `drizzle.config.ts`를 전부
+   다시 써야 하는데, 얻는 게 없다.
+3. **확장 경로가 더 넓다.** 그래프 연산이 복잡해지는 시점이 오면 PostgreSQL은
+   Apache AGE 같은 인그래프 확장으로 갈 수 있지만, libSQL 계열에는 대응하는
+   확장이 없어 결국 전용 그래프 DB(Neo4j 등)로 바로 건너뛰어야 한다
+   ([01_DB_SCHEMA.md §4.3](./01_DB_SCHEMA.md#43-스케일-전환-계획-지금-만들지-않음)).
+4. **배포 시 "서버 관리 없는 DB"라는 이점은 Turso만의 것이 아니다.** Neon 같은
+   서버리스 PostgreSQL이 scale-to-zero와 넉넉한 무료 티어로 같은 이점을 엔진을
+   바꾸지 않고도 준다.
 
-**결론**: `@libsql/client` + `drizzle-orm/libsql`을 채택한다. 로컬 개발과 프로덕션이
-같은 드라이버/스키마 코드를 쓰고, 로컬은 연결 문자열만 `file:./local.db`로 바꾸면
-되므로 Docker나 별도 DB 서버가 필요 없다. `@tursodatabase/database`는 더 가볍지만
-아직 beta라 MVP 기준선으로 채택하지 않는다 — 안정화되면 재검토한다.
+**결론**: `postgres`(postgres-js) + `drizzle-orm/postgres-js`를 유지한다. 로컬
+개발은 `docker-compose.yml`의 Postgres 컨테이너를 쓰고, 배포는 Vercel + 관리형
+Postgres(Neon 등 후보, 미확정)를 검토한다.
 
-**스키마/그래프 저장 구조에 미치는 영향**: libSQL도 관계형(SQLite 계열) 엔진이므로
-[01_DB_SCHEMA.md §4](./01_DB_SCHEMA.md#4-mutual-follow-그래프-저장-구조)의 "관계형
-테이블 + 요청 시 인메모리 BFS" 결론은 그대로 유지된다. 바뀐 것은 엔진뿐이고, 바뀌지
-않은 것은 그래프를 다루는 방식이다. 타입 매핑 차이(UUID/timestamp/boolean 표현
-방식)는 [01_DB_SCHEMA.md §2](./01_DB_SCHEMA.md#2-테이블-정의)에 반영했다.
-
-**남은 실무 작업**: 이전에 PostgreSQL 기준으로 이미 스캐폴딩해 둔 `packages/db`
-코드(`pgTable`, `drizzle-orm/postgres-js`)와 `docker-compose.yml`은 이 결정과 더 이상
-맞지 않는다. 문서 정리가 끝난 뒤 실제 코드를 `drizzle-orm/sqlite-core` +
-`drizzle-orm/libsql` 기준으로 옮기고 `docker-compose.yml`은 제거해야 한다 — 아직
-구현 단계로 넘어가지 않았으므로 이번 문서 업데이트에서는 코드를 건드리지 않았다.
+**스키마/그래프 저장 구조에 미치는 영향**: 없음 — 엔진을 바꾸지 않기로 했으므로
+`packages/db`의 `pgTable` 기반 스키마와 [01_DB_SCHEMA.md §2](./01_DB_SCHEMA.md#2-테이블-정의)의
+PostgreSQL 타입(uuid/timestamptz/boolean)이 그대로 정본이다.
 
 ### 1.4 ORM: Drizzle (Prisma 대신)
 
@@ -78,16 +79,14 @@ Docker로 띄우는 방안을 임시로 마련했으나, 이 프로젝트는 "�
 **비교**:
 - Prisma: 개발 경험(Prisma Studio, 자동완성)이 좋지만 별도 쿼리 엔진 프로세스와
   런타임 오버헤드가 있고, 원시 SQL에 가까운 세밀한 제어(예: `ON CONFLICT DO UPDATE ...
-  RETURNING`을 이용한 upsert-by-natural-key 패턴)가 상대적으로 번거롭다. libSQL/Turso
-  지원도 Drizzle 쪽이 더 먼저 자리잡았다.
+  RETURNING`을 이용한 upsert-by-natural-key 패턴)가 상대적으로 번거롭다.
 - Drizzle: SQL에 가까운 타입 우선 API, 런타임 오버헤드가 거의 없음, 마이그레이션이
   일반 SQL 파일로 나와 리뷰하기 쉬움. Identity Hash처럼 unique 제약과 조건부 upsert가
-  중요한 스키마([01_DB_SCHEMA.md](./01_DB_SCHEMA.md))에 더 적합하고, libSQL/Turso를
-  위한 전용 `dialect: "turso"` 설정을 `drizzle-kit`이 공식 지원한다.
+  중요한 스키마([01_DB_SCHEMA.md](./01_DB_SCHEMA.md))에 더 적합하다.
 
-**결론**: Drizzle을 사용한다. `drizzle.config.ts`는 `dialect: "turso"`,
-`dbCredentials: { url, authToken }`로 구성하고, 로컬 개발은 `authToken` 없이
-`url: "file:./local.db"`만 지정한다.
+**결론**: Drizzle을 사용한다. `drizzle.config.ts`는 `dialect: "postgresql"`,
+`dbCredentials: { url }`로 구성한다 (`DATABASE_URL`, 로컬은
+`docker-compose.yml`의 Postgres 컨테이너를 가리킨다).
 
 ### 1.5 인증/세션
 
@@ -108,9 +107,9 @@ pnpm 모노레포로 핵심 로직을 프레임워크에서 분리한다.
 
 ```text
 apps/web        Next.js — UI + API Route (서버 전용 코드: 세션, 해싱, DB 접근)
-packages/ig-parser   ZIP/JSON 파싱 + mutual 계산 (순수 함수, 브라우저/Node 겸용)
+packages/ig-parser   ZIP/JSON 파싱 + following 목록 추출 (순수 함수, 브라우저/Node 겸용)
 packages/graph       그래프 빌드 + BFS + 통계 (순수 함수, DB/UI 의존성 없음)
-packages/db          Drizzle 스키마 + libSQL(Turso) 클라이언트
+packages/db          Drizzle 스키마 + PostgreSQL(postgres-js) 클라이언트
 packages/shared      Zod 스키마 (API 요청/응답 타입)
 ```
 
@@ -127,8 +126,9 @@ packages/shared      Zod 스키마 (API 요청/응답 타입)
 원칙이 실제로 어디에서 강제되는지는 [01_DB_SCHEMA.md](./01_DB_SCHEMA.md)와
 [02_API_SPECS.md](./02_API_SPECS.md)에서 구체적으로 다룬다.
 
-1. **원본 데이터는 브라우저를 벗어나지 않는다.** ZIP 파일과 followers/following 원본
-   목록은 서버로 전송하지 않는다. 서버는 클라이언트가 계산한 mutual 목록만 받는다.
+1. **원본 데이터는 브라우저를 벗어나지 않는다.** ZIP 파일 자체는 서버로 전송하지
+   않는다. 서버는 클라이언트가 뽑아낸 following 목록만 받는다 — followers는
+   애초에 요청하지도 않는다(§ 5 참고).
 2. **평문 username을 저장하지 않는다.** 저장되는 모든 식별자는 서버 전용 비밀(pepper)이
    섞인 해시다. 이 해시가 "익명"이 아니라 "가명"이라는 점(운영자는 여전히 역추적
    가능)을 모든 설계 문서와 개인정보처리방침에 명시한다.
@@ -137,8 +137,11 @@ packages/shared      Zod 스키마 (API 요청/응답 타입)
    원칙(기획서 6장)을 API 설계로도 강제한다.
 4. **경로가 아니라 거리만 계산하고 반환한다.** 두 참여자 사이의 중간 연결자는 어떤
    API 응답에도, 어떤 내부 함수 시그니처에도 등장할 수 없게 만든다.
-5. **최소 그래프만 저장한다.** followers/following 전체가 아니라 맞팔(mutual)만
-   edge로 저장한다.
+5. **참여자 사이의 확인된 맞팔만 그래프에 존재한다(participant-only).** followers는
+   아예 수집하지 않는다. 각 참여자가 신고한 following(방향성 있는 주장)을
+   양방향으로 대조해서, 상대도 참여해서 되팔로우를 신고했을 때만 edge로
+   인정한다 — 참여하지 않은 사람은 그래프에 노드로도, edge로도 전혀 등장하지
+   않는다([01_DB_SCHEMA.md §4](./01_DB_SCHEMA.md#4-mutual-follow-그래프-저장-구조)).
 
 ## 4. 성능/UX 목표
 
@@ -151,14 +154,12 @@ packages/shared      Zod 스키마 (API 요청/응답 타입)
 
 ## 5. 미해결 사항 ([TODO])
 
-- **[TODO][High]** 참여자 정의 확정: "그래프에 노드로 등장한 모든 사람" vs "실제로
-  업로드를 완료한 사람"만 통계에 포함할지. [01_DB_SCHEMA.md §3.3](./01_DB_SCHEMA.md#33-ghost-노드와-참여자-정의-미해결)
+- **[해결됨]** ~~참여자 정의 확정~~ — participant-only 그래프 모델로 전환하면서
+  저절로 해결됨: 그래프에 노드로 등장하는 사람 = 실제로 업로드를 완료한 사람이
+  항상 같다(고스트 노드가 없음). [01_DB_SCHEMA.md §3.6](./01_DB_SCHEMA.md#36-ghost-노드와-참여자-정의-해결됨--애초에-고스트-노드를-만들지-않기로-함)
   참고.
-- **[TODO][Medium]** Turso Cloud 프로젝트/리전 확정 (배포 대상). 이 문서의 다른
-  결정에 영향을 주지 않으므로 구현 착수와 별개로 진행 가능.
-- **[TODO][High]** 기존에 PostgreSQL 기준으로 스캐폴딩된 `packages/db`,
-  `docker-compose.yml`을 libSQL 기준으로 마이그레이션 (§1.3 "남은 실무 작업").
-  구현 단계로 넘어갈 때 가장 먼저 처리한다.
+- **[TODO][Medium]** 배포용 관리형 PostgreSQL 프로바이더 확정(Neon 등 후보,
+  §1.3). 이 문서의 다른 결정에 영향을 주지 않으므로 구현 착수와 별개로 진행 가능.
 - **[TODO][Medium]** `IDENTITY_PEPPER` 회전 절차. 현재는 "최초 설정 후 바꾸지 않는다"가
   기본 가정이다.
 - **[TODO][Low]** 세션 쿠키 분실 시 복구 수단 (§1.5).

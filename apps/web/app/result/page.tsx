@@ -1,3 +1,3 @@
-import { WalkthroughShare } from "@/components/Walkthrough";
+import { ResultScreen } from "@/components/ResultScreen";
 
-export default function ResultPage() { return <WalkthroughShare />; }
+export default function ResultPage() { return <ResultScreen />; }

@@ -14,7 +14,7 @@ export function Character({ kind = "wave", className = "" }: { kind?: "wave" | "
 export function Steps({ active }: { active: number }) {
   return <ol className="steps">{["파일 업로드", "분석 중", "결과 확인"].map((label, i) => <li key={label} className={active === i ? "active" : ""} aria-current={active === i ? "step" : undefined}><span>{i + 1}</span>{label}</li>)}</ol>;
 }
-export function PrivacyNote() { return <div className="privacy-note"><Icon name="lock" /><div><strong>연결 계산에 필요한 맞팔 관계를 서버에 저장해요.</strong><p>원본 파일은 서버로 보내지 않아요.</p></div></div>; }
+export function PrivacyNote() { return <div className="privacy-note"><Icon name="lock" /><div><strong>연결 계산에 필요한 정보만 사용해요.</strong></div></div>; }
 
 export function ConnectionSearchArt() {
   return <div className="connection-search-art" role="img" aria-label="돋보기를 든 귤이 사람들 사이의 연결을 찾는 모습">

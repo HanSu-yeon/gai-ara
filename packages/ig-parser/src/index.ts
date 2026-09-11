@@ -1,21 +1,28 @@
-import { computeMutuals } from "./mutuals";
-import { extractFollowerData, InstagramExportParseError } from "./zip";
+import { normalizeUsername } from "./normalize";
+import { extractFollowing } from "./zip";
 
 export { normalizeUsername, extractUsernames } from "./normalize";
-export { computeMutuals } from "./mutuals";
-export { extractFollowerData, InstagramExportParseError } from "./zip";
+export { extractFollowing, InstagramExportParseError } from "./zip";
+export { suggestUsernameFromFilename } from "./filename";
 
 /**
  * 브라우저에서 실행하는 최상위 진입점.
- * ZIP -> followers/following 추출 -> 맞팔 교집합까지 한 번에 처리한다.
- * 원본 follower/following 전체 목록은 반환하지 않고 mutuals만 반환하여,
- * 호출자가 실수로 전체 목록을 서버에 올리는 일을 구조적으로 막는다.
+ * ZIP -> following 목록 추출 -> 정규화/중복 제거까지 한 번에 처리한다.
+ *
+ * `selfUsername`을 넘기면 결과에서 제외한다 — 실제 인스타그램에서는 자기
+ * 자신을 팔로우할 수 없지만, export 데이터의 정합성을 신뢰하지 않고 이
+ * 단계에서 명시적으로 방어한다.
  */
-export async function parseMutualsFromZip(
+export async function parseFollowingFromZip(
   zipInput: ArrayBuffer | Uint8Array | Blob,
+  selfUsername?: string,
 ): Promise<string[]> {
-  const { followers, following } = await extractFollowerData(zipInput);
-  return computeMutuals(followers, following);
-}
+  const following = await extractFollowing(zipInput);
+  const normalized = new Set(following.map(normalizeUsername));
 
-export { suggestUsernameFromFilename } from "./filename";
+  if (selfUsername) {
+    normalized.delete(normalizeUsername(selfUsername));
+  }
+
+  return [...normalized].sort();
+}

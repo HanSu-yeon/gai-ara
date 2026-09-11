@@ -1,11 +1,13 @@
 # DB Schema & Identity/Graph Design
 > Created: 2026-09-10 22:30
-> Last Updated: 2026-09-10 23:10
+> Last Updated: 2026-09-12 02:00
 
-**DB 엔진**: [00_DEVELOPMENT_PRINCIPLES.md §1.3](./00_DEVELOPMENT_PRINCIPLES.md#13-db-turso--libsql-postgresql에서-변경-그래프-전용-db는-여전히-사용하지-않음)에서
-PostgreSQL 대신 Turso(libSQL, SQLite 호환)로 확정했다. 아래 스키마와 §4의 그래프
-저장 구조 결론은 엔진 변경과 무관하게 유지되며, 타입 표기만 SQLite 계열 기준으로
-갱신했다.
+**DB 엔진**: PostgreSQL. Turso(libSQL)로 바꾸는 걸 검토했다가, 이 워크로드가
+SQLite 계열의 장점을 살릴 수 없고 마이그레이션 비용 대비 얻는 게 없어 다시
+PostgreSQL로 확정했다 — 경위는
+[00_DEVELOPMENT_PRINCIPLES.md §1.3](./00_DEVELOPMENT_PRINCIPLES.md#13-db-postgresql-tursolibsql-검토했다가-되돌림-그래프-전용-db는-여전히-사용하지-않음)
+참고. 아래 스키마는 실제 코드(`packages/db/src/schema.ts`, `pgTable`)와 동일한
+PostgreSQL 타입으로 표기한다.
 
 이 문서는 두 가지 핵심 결정을 다룬다: (1) Instagram username을 서버에서 어떻게
 식별/매칭할지, (2) 참여자 사이의 mutual-follow 관계를 어떤 데이터 구조로 저장할지.
@@ -14,15 +16,17 @@ PostgreSQL 대신 Turso(libSQL, SQLite 호환)로 확정했다. 아래 스키마
 ## 1. 엔티티 개요
 
 ```text
-participants (1) ──< relationships >── (1) participants
+participants (1) ──< follows >── identity_hash(참여 여부 무관)
 participants (1) ──< sessions
 participants (1) ──< pair_invites (inviter) >── pair_invites (recipient) >── (1) participants
 pair_invites (1) ── pair_results (1)
 ```
 
-- `participants`: 그래프의 노드. 실제로 서비스에 업로드한 사람과, 누군가의 맞팔
-  목록에만 등장한 "고스트" 노드를 모두 포함한다 (§3.3).
-- `relationships`: 그래프의 무방향 edge. 맞팔 관계만 저장한다.
+- `participants`: 그래프의 노드. **오직 실제로 자기 데이터를 업로드한 사람만**
+  담는다 — "고스트" 노드는 없다(participant-only 그래프, §4 참고).
+- `follows`: 한 참여자가 "나는 이 사람을 팔로우한다"고 신고한 방향성 있는 주장.
+  이것만으로는 그래프에 edge가 생기지 않는다 — 상대도 참여해서 반대 방향을
+  신고해야 mutual로 확정된다(§4.2).
 - `sessions`: 로그인 없이 "내 결과 다시 보기"를 지원하기 위한 최소 세션.
 - `pair_invites` / `pair_results`: "우리 몇다리?" consent 플로우의 상태 저장소
   ([02_API_SPECS.md §3](./02_API_SPECS.md#3-초대consent-플로우)에서 흐름을 다룬다).
@@ -31,52 +35,43 @@ pair_invites (1) ── pair_results (1)
 
 ```sql
 participants
-  id                  text PK                    -- UUID 문자열, 애플리케이션에서 생성
+  id                  uuid PK default gen_random_uuid()
   identity_hash       text UNIQUE NOT NULL       -- §3 참고, 평문 username 아님
-  has_uploaded_own_data integer NOT NULL default 0  -- boolean (0/1)
-  created_at          integer NOT NULL           -- unix ms epoch
+  created_at          timestamptz NOT NULL default now()
 
 sessions
   token               text PK                    -- 무작위 256bit, httpOnly 쿠키 값
-  participant_id      text NOT NULL REFERENCES participants(id) ON DELETE CASCADE
-  created_at          integer NOT NULL
-  expires_at          integer NOT NULL
+  participant_id      uuid NOT NULL REFERENCES participants(id) ON DELETE CASCADE
+  created_at          timestamptz NOT NULL default now()
+  expires_at          timestamptz NOT NULL
 
-relationships
-  id                  text PK                    -- UUID 문자열
-  participant_a_id    text NOT NULL REFERENCES participants(id) ON DELETE CASCADE
-  participant_b_id    text NOT NULL REFERENCES participants(id) ON DELETE CASCADE
-  created_at          integer NOT NULL
-  UNIQUE (participant_a_id, participant_b_id)     -- 항상 a_id < b_id로 정규화 저장
+follows
+  id                        uuid PK default gen_random_uuid()
+  follower_participant_id   uuid NOT NULL REFERENCES participants(id) ON DELETE CASCADE
+  followee_identity_hash    text NOT NULL        -- FK 아님 — 아직 참여 안 한 사람의 해시도 담을 수 있어야 함
+  created_at                timestamptz NOT NULL default now()
+  UNIQUE (follower_participant_id, followee_identity_hash)
 
 pair_invites
-  id                       text PK                -- UUID 문자열
+  id                       uuid PK default gen_random_uuid()
   token                    text UNIQUE NOT NULL   -- 무작위 128bit, URL에 노출됨
-  inviter_participant_id   text NOT NULL REFERENCES participants(id) ON DELETE CASCADE
-  recipient_participant_id text REFERENCES participants(id) ON DELETE CASCADE  -- accept 전 NULL
+  inviter_participant_id   uuid NOT NULL REFERENCES participants(id) ON DELETE CASCADE
+  recipient_participant_id uuid REFERENCES participants(id) ON DELETE CASCADE  -- accept 전 NULL
   status                   text NOT NULL default 'pending'  -- pending | accepted | expired
-  created_at               integer NOT NULL
-  expires_at               integer NOT NULL
+  created_at               timestamptz NOT NULL default now()
+  expires_at               timestamptz NOT NULL
 
 pair_results
-  id             text PK                          -- UUID 문자열
-  pair_invite_id text UNIQUE NOT NULL REFERENCES pair_invites(id) ON DELETE CASCADE
+  id             uuid PK default gen_random_uuid()
+  pair_invite_id uuid UNIQUE NOT NULL REFERENCES pair_invites(id) ON DELETE CASCADE
   distance       integer                          -- NULL이면 도달 불가
-  computed_at    integer NOT NULL
+  computed_at    timestamptz NOT NULL default now()
 ```
 
-**SQLite/libSQL 타입 매핑 메모** (PostgreSQL 버전 초안 대비 변경점):
-- `uuid` → `text`. SQLite 계열에는 UUID 타입이나 `gen_random_uuid()` 같은 기본값
-  함수가 없으므로, `crypto.randomUUID()`로 애플리케이션 코드에서 생성해 넣는다
-  (Drizzle의 `$defaultFn(() => crypto.randomUUID())`).
-- `timestamptz` → `integer` (unix ms epoch). Drizzle의
-  `integer(col, { mode: "timestamp_ms" })`가 JS `Date` ↔ integer 변환을 투명하게
-  처리한다.
-- `boolean` → `integer` (0/1). Drizzle의 `integer(col, { mode: "boolean" })`가
-  JS `boolean` ↔ integer 변환을 투명하게 처리한다.
-- `ON CONFLICT (identity_hash) DO UPDATE ... RETURNING`(upsert-by-natural-key
-  패턴, §3.3에서 상세)은 SQLite 3.35+/libSQL에서도 Postgres와 동일한 `excluded.*`
-  문법으로 동작하므로 이 부분의 설계는 변경 없음.
+실제 정의는 `packages/db/src/schema.ts`(Drizzle `pgTable`)가 정본이며, 위 표는
+그것을 그대로 옮긴 것이다. `ON CONFLICT (identity_hash) DO UPDATE ... RETURNING`
+(upsert-by-natural-key 패턴, §3.3에서 상세)은 PostgreSQL의 `excluded.*` 문법을
+그대로 쓴다.
 
 **id 선택**: 순번 정수 대신 UUID를 쓴다. `pair_invites.token`이 이미 참여자를 직접
 가리키지 않는 별도 난수이므로 보안상 필수는 아니지만, `participants.id`가 URL 등에
@@ -120,8 +115,8 @@ normalize(username) = username.trim().replace(/^@/, "").toLowerCase()
 
 - `IDENTITY_PEPPER`는 서버 환경 변수로만 존재하고 클라이언트에는 절대 내려가지
   않는다. 노출되는 순간 D는 사실상 B(무방비 해시)로 격하된다.
-- `normalize()`는 클라이언트(mutual 교집합 계산 시)와 서버(해싱 직전)에서 동일한
-  규칙으로 적용해야 한다 — 규칙이 어긋나면 같은 사람이 다른 해시로 갈라진다.
+- `normalize()`는 클라이언트(following 목록 정규화 시)와 서버(해싱 직전)에서
+  동일한 규칙으로 적용해야 한다 — 규칙이 어긋나면 같은 사람이 다른 해시로 갈라진다.
 - **가명처리 고지 의무**: 운영자는 PEPPER를 알고 있으므로 후보 username을 넣어
   역산할 수 있다. 개인정보처리방침에 "이 식별자는 익명이 아니라 가명이며, 운영자는
   기술적으로 역산이 가능하다"는 점을 명시하고, PEPPER 접근 권한을 최소화한다
@@ -155,16 +150,29 @@ Instagram 아이디를 폼에 직접 입력한다. 트레이드오프로 오타 
 서로 다른 노드로 나뉠 수 있는데, 이는 사용자 실수의 영향 범위가 작아 MVP에서는
 허용한다.
 
-### 3.6 Ghost 노드와 참여자 정의 (미해결)
+### 3.6 Ghost 노드와 참여자 정의 (해결됨 — 애초에 고스트 노드를 만들지 않기로 함)
 
-A가 업로드하면 A의 맞팔 상대(B, C, D)도 `has_uploaded_own_data = false`인 "고스트"
-노드로 그래프에 즉시 생성된다 — B가 서비스를 열어본 적이 없어도. 기획서 4장의
-"2다리 안 236명" 같은 숫자가 실제 서비스 사용자 수보다 커질 수 있다는 뜻이다.
+**이전 결정(2026-09-11)**: A가 업로드하면 A의 맞팔 상대(B, C, D)도
+`has_uploaded_own_data = false`인 "고스트" 노드로 그래프에 즉시 생성했다 — B가
+서비스를 열어본 적이 없어도. "참여자의 N%" 같은 백분율의 분모를 어떻게
+정의할지(전체 노드 vs 실제 업로더만)가 미해결로 남아 있었고, 한 차례는 "분모가
+필요한 지표(퍼센트) 자체를 노출하지 않는다"로 봉합했었다.
 
-**결정 필요**: 개인 결과의 분모("현재 참여자의 71%")를 계산할 때 (a) 그래프에
-노드로 등장한 모든 사람을 참여자로 셀지, (b) `has_uploaded_own_data = true`인
-사람만 참여자로 셀지 제품 결정이 필요하다. 스키마는 플래그를 분리해두어 두 정의를
-모두 지원하지만, 문구("참여자")가 사용자에게 무엇을 의미하는지는 결정된 바 없다.
+**최종 결정(2026-09-12, 재검토)**: 그래프 생성 모델 자체를 participant-only로
+바꿨다(§4.2) — followers는 아예 수집하지 않고, 각 참여자는 자기 following만
+올린다. A가 X를 팔로우한다고 신고해도, X가 직접 참여해서 반대 방향(X가 A를
+팔로우한다)을 신고하기 전까지는 edge가 생기지 않는다. 그 결과:
+
+- **고스트 노드가 원천적으로 없다.** `participants` 테이블에는 실제로 업로드한
+  사람만 존재한다. `has_uploaded_own_data` 플래그 자체가 필요 없어져 스키마에서
+  제거했다.
+- **분모 문제가 저절로 해소됐다.** "참여자"라는 단어가 이제 모호하지 않다 —
+  그래프에 노드로 존재하는 사람 = 실제로 참여한 사람이 항상 성립한다.
+- **트레이드오프**: 참여자가 적을 때는 "내 결과" 화면의 직접 연결 수가 실제
+  인스타 맞팔 수보다 작게(대개 0) 나온다 — 상대도 참여해야 확인되므로. 이건
+  버그가 아니라 의도된 동작이다: [ResultScreen.tsx](../../apps/web/components/ResultScreen.tsx)는
+  `direct === 0`일 때 "친구를 초대하면 첫 연결이 생겨요" 안내를 보여줘서, 빈
+  상태를 초대 유도로 전환한다.
 
 ## 4. Mutual-Follow 그래프 저장 구조
 
@@ -173,19 +181,44 @@ A가 업로드하면 A의 맞팔 상대(B, C, D)도 `has_uploaded_own_data = fal
 | 옵션 | 방식 | 장점 | 단점 |
 | :--- | :--- | :--- | :--- |
 | A | 전용 그래프 DB (Neo4j, Dgraph 등) | 다중 홉 순회에 최적화 | 별도 스테이트풀 시스템 운영 부담(백업/모니터링 이중화), MVP 규모에서 이점을 체감하기 어려움 |
-| B | Turso(libSQL) 관계형 테이블 + 요청 시 인메모리 BFS | 데이터스토어 단일화, 서버 프로세스 없이 로컬 개발 가능(§00_DEVELOPMENT_PRINCIPLES §1.3) | 그래프가 매우 커지면(수백만 edge) 매 요청 전체 스캔이 느려짐 |
+| B | PostgreSQL 관계형 테이블 + 요청 시 인메모리 BFS | 데이터스토어 단일화, 이미 검증된 드라이버/툴링(§00_DEVELOPMENT_PRINCIPLES §1.3) | 그래프가 매우 커지면(수백만 edge) 매 요청 전체 스캔이 느려짐 |
 
-### 4.2 채택안: B (Turso/libSQL + 요청 시 인메모리 BFS)
+### 4.2 채택안: B (PostgreSQL + participant-only mutual + 요청 시 인메모리 BFS)
 
-- `relationships` 테이블에서 전체 edge를 읽어 `Map<NodeId, Set<NodeId>>` 인접
-  리스트를 구성하고, 그 위에서 BFS로 최단 거리를 계산한다.
-- **규모 추정**: MVP 단계 참여자 수천~수만, 1인당 맞팔 수를 넉넉히 수백 명으로
-  잡아도 edge 수는 수만~십만대. 이 규모에서 인접 리스트 구성 + BFS는 수십 ms
-  이내로, [00_DEVELOPMENT_PRINCIPLES.md §4](./00_DEVELOPMENT_PRINCIPLES.md#4-성능ux-목표)의
-  P95 400ms 목표에 여유 있게 들어온다.
-- **무방향 edge 중복 방지**: `(participant_a_id, participant_b_id)`를 항상
-  `a_id < b_id` 문자열 비교 순서로 저장해서 (A,B)/(B,A) 중복 저장을 애플리케이션
-  레이어에서 막는다.
+**모델(2026-09-12 확정)**: 각 참여자는 자기 following만 업로드한다(followers는
+아예 받지 않는다). "A와 B가 맞팔이다(=그래프 edge다)"는 오직 다음 조건이 모두
+성립할 때만 성립한다:
+
+1. A가 `follows`에 "A → B" 방향을 신고했다 (A의 following.json에 B가 있음).
+2. B도 참여자로 존재하고, `follows`에 "B → A" 방향을 신고했다 (B의
+   following.json에 A가 있음).
+
+한쪽만 신고한 관계, 또는 상대가 아직 참여하지 않은 관계는 edge가 아니다 — 그래프에
+전혀 나타나지 않는다. `getAllEdges()`가 요청마다 `follows`를 자기 자신과 조인해서
+이 조건을 만족하는 pair만 골라낸다:
+
+```sql
+SELECT DISTINCT f1.follower_participant_id AS a, p2.id AS b
+FROM follows f1
+JOIN participants p1 ON p1.id = f1.follower_participant_id
+JOIN participants p2 ON p2.identity_hash = f1.followee_identity_hash
+JOIN follows f2 ON f2.follower_participant_id = p2.id
+  AND f2.followee_identity_hash = p1.identity_hash
+WHERE f1.follower_participant_id < p2.id
+```
+
+그렇게 골라낸 edge들로 `Map<NodeId, Set<NodeId>>` 인접 리스트를 구성하고, 그 위에서
+BFS로 최단 거리를 계산한다(`packages/graph`, 이 조인 로직과 완전히 분리돼 있어
+전혀 손대지 않았다).
+
+- **재업로드**: 참여자가 다시 업로드하면 그 사람이 follower인 `follows` 행을
+  전부 지우고 새 목록으로 교체한다(`syncFollowingBatch`) — 언팔로우한 사람과의
+  edge는 다음 조회부터 자동으로 사라진다.
+- **규모 추정**: MVP 단계 참여자 수천~수만, 1인당 following 수를 넉넉히 수백
+  명으로 잡아도 `follows` 행 수는 수만~십만대. 자기 조인 + BFS는 이 규모에서
+  수십 ms 이내로, [00_DEVELOPMENT_PRINCIPLES.md §4](./00_DEVELOPMENT_PRINCIPLES.md#4-성능ux-목표)의
+  P95 400ms 목표에 여유 있게 들어온다. 참여자가 훨씬 늘어나 이 조인이 느려지면
+  §4.3의 캐싱/델타 재계산 전략으로 넘어간다.
 
 ### 4.3 스케일 전환 계획 (지금 만들지 않음)
 
@@ -194,14 +227,35 @@ A가 업로드하면 A의 맞팔 상대(B, C, D)도 `has_uploaded_own_data = fal
 - 프로파일링 결과 `GET /api/me/result`의 P95가 400ms 목표를 지속적으로 초과할 때.
 - edge 수가 대략 50만~100만을 넘어설 때(추정치, 실측으로 재조정).
 - 대응 후보(우선순위 순): (1) 요청마다 전체 재조회 대신 짧은 TTL의 인메모리 그래프
-  스냅샷 캐시, (2) edge 추가 시 영향받는 참여자만 델타 재계산, (3) Turso의 embedded
-  replica(로컬 파일에 원격 DB를 동기화해두는 기능)로 읽기 지연을 줄이는 것 — 단,
-  서버리스 배포(Vercel 등)에서는 함수 인스턴스가 매번 새로 뜨므로 이 기능의 이점이
-  제한적이다. 그 이상으로 그래프 자체의 순회 성능이 병목이 되면(예: 임의 N-hop 쿼리,
-  커뮤니티 탐지 등 복잡한 그래프 연산이 필요해지면), libSQL 계열에는 PostgreSQL의
-  Apache AGE 같은 인그래프 확장이 없으므로 전용 그래프 DB(Neo4j 등)로의 이전을
-  검토한다 — 즉 "관계형 DB 안에서 그래프 확장을 얹는" 중간 단계 없이 옵션 A로 바로
-  넘어가는 것이 libSQL 기준의 현실적인 스케일 경로다.
+  스냅샷 캐시, (2) edge 추가 시 영향받는 참여자만 델타 재계산, (3) 읽기 전용
+  복제본(read replica)이나 connection pooling(PgBouncer 등)으로 읽기 지연/부하를
+  줄이는 것. 그 이상으로 그래프 자체의 순회 성능이 병목이 되면(예: 임의 N-hop
+  쿼리, 커뮤니티 탐지 등 복잡한 그래프 연산이 필요해지면), PostgreSQL의 Apache
+  AGE 같은 인그래프 확장을 먼저 검토하고, 그것도 부족하면 전용 그래프 DB(Neo4j
+  등, 옵션 A)로의 이전을 검토한다 — "관계형 DB 안에서 그래프 확장을 얹는" 중간
+  단계가 있다는 게 PostgreSQL을 유지하는 이유 중 하나다.
+
+### 4.4 reported vs verified edge (해결됨 — §4.2가 사실상 verified-only 모델)
+
+**이전 검토(2026-09-11)**: 당시 모델(followers ∩ following 자기 신고)은 A
+혼자 업로드해도 A-X edge가 생겨서, X 쪽 데이터로 독립 검증하지 않는다는 한계가
+있었다. `reported`(한쪽만 주장) → `verified`(양쪽 다 확인) 상태를 나중에
+추가하는 방향을 고려한다고 적어뒀었다.
+
+**현재 상태(2026-09-12)**: §4.2로 모델을 바꾸면서 이 구분이 필요 없어졌다 —
+`follows`는 항상 한쪽 방향의 신고(reported)만 담고, `getAllEdges()`가 양방향이
+모두 존재할 때만 edge로 인정하므로, **그래프에 나타나는 모든 edge는 이미
+verified다.** `reported`이지만 아직 `verified`가 아닌 관계(상대가 참여 안 했거나
+아직 맞팔이 아님)는 `follows`에는 남아있지만 BFS가 순회하는 그래프에는 전혀
+등장하지 않는다 — 별도 `verified` 컬럼 없이 조인 조건 자체가 그 역할을 한다.
+
+### 4.5 향후 고려사항: 분석 이벤트에는 raw distance를 그대로 사용
+
+나중에 분석 도구(GA 등)를 붙이게 되면, BFS distance(edge 개수, 예:
+`connection_distance = 2`)를 그대로 이벤트 값으로 보내고, 화면 문구("한 다리
+건너 아는 사이")는 순수하게 표시용으로만 분리해서 다룬다 — 분석 데이터와
+UX 카피 변환을 섞지 않는다. 관련 변환 함수는
+[apps/web/lib/distance-copy.ts](../../apps/web/lib/distance-copy.ts)에 있다.
 
 ## 5. Related Documents
 

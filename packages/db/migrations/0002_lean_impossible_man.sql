@@ -1,0 +1,1 @@
+ALTER TABLE "pair_invites" ADD COLUMN "inviter_nickname" text;
