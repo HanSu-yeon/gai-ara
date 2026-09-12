@@ -98,7 +98,7 @@ export function ImportOnboarding({ onUploaded }: { onUploaded: () => void | Prom
 export function ResumeImport() {
   const [progress, setProgress] = useState<ReturnType<typeof readImportProgress>>(null);
   useEffect(() => { setProgress(readImportProgress()); }, []);
-  if (!progress) return null;
+  if (!progress || progress.path === "/upload") return null;
   return <Link className="guide-button" href={progress.path} onClick={() => {
     trackEvent("import_resume_click", { source: importSource(progress.path), entry: "home" });
   }}>
