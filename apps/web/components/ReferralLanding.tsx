@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import type { ReferralResult } from "@gai-ara/shared";
 import { ImportOnboarding } from "@/components/ImportOnboarding";
 import { BrandHeader, Character, Centered, StatusMessage } from "@/components/Brand";
 import { UnreachableResult } from "@/components/UnreachableResult";
-import { formatConnectionPhrase } from "@/lib/distance-copy";
+import { formatConnectionPhrase, formatConnectionDiagram } from "@/lib/distance-copy";
 import { trackEvent } from "@/lib/analytics";
 import { clearImportProgress } from "@/lib/import-progress";
 
@@ -25,7 +26,6 @@ export function ReferralLanding() {
   const token = params.token;
 
   const [linkStatus, setLinkStatus] = useState<LinkStatus>("loading");
-  const [nickname, setNickname] = useState<string | null>(null);
   const [result, setResult] = useState<ReferralResult | null>(null);
   const [hasSession, setHasSession] = useState(false);
   const [wantsReupload, setWantsReupload] = useState(false);
@@ -42,15 +42,7 @@ export function ReferralLanding() {
 
   useEffect(() => {
     fetch(`/api/r/${token}`)
-      .then(async (response) => {
-        if (!response.ok) {
-          setLinkStatus("not-found");
-          return;
-        }
-        const data = (await response.json()) as { nickname: string | null };
-        setNickname(data.nickname);
-        setLinkStatus("ready");
-      })
+      .then((response) => setLinkStatus(response.ok ? "ready" : "not-found"))
       .catch(() => setLinkStatus("not-found"));
   }, [token]);
 
@@ -104,11 +96,25 @@ export function ReferralLanding() {
       return <Centered character="search"><StatusMessage>이건 본인의 링크예요.</StatusMessage></Centered>;
     }
     if (result.status === "unreachable") return <UnreachableResult />;
+
+    const distance = result.distance ?? 1;
+    if (distance <= 1) {
+      return (
+        <Centered character="wave">
+          <p className="pair-result-title">이미 바로 아는 사이네요</p>
+          <p className="pair-result-kicker">다른 사람을 거치지 않고<br />바로 연결되어 있어요.</p>
+          <Link href="/result" className="primary-button mt-6">내 링크 만들어보기</Link>
+          <p className="result-note mt-3">또 다른 연결도 찾아볼 수 있어요.</p>
+        </Centered>
+      );
+    }
     return (
       <Centered character="wave">
-        <p className="pair-result-kicker">{nickname ?? "친구"}님과</p>
-        <p className="pair-result-title">{formatConnectionPhrase(result.distance ?? 1)}</p>
-        <p className="pair-result-kicker">예요!</p>
+        <p className="pair-result-title">{formatConnectionPhrase(distance)}</p>
+        <p className="connection-diagram" aria-hidden="true">{formatConnectionDiagram(distance)}</p>
+        <p className="pair-result-kicker">둘 사이에 {distance - 1}명의 지인이 이어져 있어요.</p>
+        <p className="result-note mt-8">다른 사람과도 이어져 있을까?</p>
+        <Link href="/result" className="text-link text-xs">내 링크 만들기</Link>
       </Centered>
     );
   }
@@ -118,9 +124,10 @@ export function ReferralLanding() {
       <BrandHeader home />
       <Character kind="wave" className="result-character" />
       <h1 className="upload-heading">
-        {nickname ? <>{nickname}님이 초대했어요</> : "친구가 초대했어요"}<br />
-        우리 몇 다리 건너<br />아는 사이일까요?
+        나와 이 링크를 만든 사람 사이,<br />몇 명의 지인을 거치면 닿을까요?
       </h1>
+      <p className="connection-diagram" aria-hidden="true">나 ─ ● ─ ● ─ 상대</p>
+      <p className="subtitle">우리 사이를 이어주는 사람이<br />몇 명인지 찾아봐요.</p>
       <input className="username-input mb-3 mt-6" value={visitorNickname} onChange={(event) => setVisitorNickname(event.target.value)}
         placeholder="내 닉네임 (선택, 상대방에게 보여요)" maxLength={20} aria-label="내 닉네임" />
       {hasSession && !wantsReupload ? (

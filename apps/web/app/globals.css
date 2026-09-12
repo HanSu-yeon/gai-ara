@@ -68,6 +68,7 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .pair-status-message { color:var(--color-deep-green); font-family:var(--font-rounded), var(--font-sans); font-size:clamp(24px, 6.6vw, 31px); font-weight:400; font-synthesis:none; letter-spacing:-.045em; line-height:1.45; word-break:keep-all; }
 .pair-result-kicker { color:#6f6a64; font-size:18px; line-height:1.7; }
 .pair-result-title { color:var(--color-tangerine); font-family:var(--font-rounded), var(--font-sans); font-size:clamp(27px, 7.4vw, 36px); font-weight:400; font-synthesis:none; letter-spacing:-.045em; line-height:1.45; word-break:keep-all; }
+.connection-diagram { color:#a4a195; font-size:14px; letter-spacing:.02em; margin-top:12px; }
 .connections-list { display:flex; flex-direction:column; gap:8px; margin-top:16px; }.connections-list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border:1px solid #e7e3d8; border-radius:14px; text-align:left; }.connections-list-label { font-size:14px; font-weight:700; color:#18563a; overflow-wrap:anywhere; }.connections-list-status { font-size:12px; color:#7f827d; white-space:nowrap; }
 .referral-visits { display:flex; flex-direction:column; gap:6px; margin-top:10px; padding:0; list-style:none; }.referral-visits-item { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; padding:10px 14px; border:1px solid #e7e3d8; border-radius:12px; text-align:left; font-size:12px; background:white; font-family:inherit; cursor:pointer; }.referral-visits-item:hover { background:#f7f5ee; }.referral-visits-item span:first-child { font-weight:700; color:#18563a; overflow-wrap:anywhere; }.referral-visits-item span:last-child { color:#7f827d; white-space:nowrap; }
 @keyframes breathe { 50% { transform:translateY(-8px); } } @keyframes progress { to { transform:translateX(150%); } }
@@ -195,6 +196,10 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .example-path span { padding: 12px; border-radius: 30px; background: #e2eedb; font-weight: 700; }
 .connection-example > p:last-child, .inline-import-guide > p { margin-top: 12px; font-size: 13px; line-height: 1.8; color: #626a60; }
 .import-title { margin: 24px 0 12px; font-size: 24px; font-weight: 700; color: #18563a; }
+.export-checklist { margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: #fffdf7; border: 1px solid #ece7dd; text-align: left; }
+.export-checklist-title { font-size: 13px; font-weight: 700; color: #18563a; }
+.export-checklist p { margin-top: 6px; font-size: 13px; color: #5f6669; }
+.export-checklist strong { color: #18563a; }
 .import-onboarding .upload-form { margin-top: 24px; }
 .resume-note { margin-top: 16px; padding: 12px; border-radius: 12px; background: #e2eedb; font-size: 14px; }
 .file-location-hint { margin: 16px 0 0; padding: 12px; border-radius: 12px; background: #fff0e1; color: #765333; font-size: 13px; }

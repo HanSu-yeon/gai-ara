@@ -23,3 +23,14 @@ export function formatConnectionPhrase(distance: number): string {
   const numeral = KOREAN_NUMERALS[intermediaries] ?? `${intermediaries}`;
   return `${numeral} 다리 건너 아는 사이`;
 }
+
+/**
+ * "나 ─ ● ─ ● ─ 상대" 형태의 시각 설명. 점(●) 개수는 중간 지인 수
+ * (intermediaries = distance - 1)와 같다 — 직접 연결(distance 1)이면 점 없이
+ * "나 ─ 상대"만 보여준다.
+ */
+export function formatConnectionDiagram(distance: number): string {
+  const intermediaries = Math.max(distance - 1, 0);
+  const dots = "● ─ ".repeat(intermediaries);
+  return `나 ─ ${dots}상대`;
+}

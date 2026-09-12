@@ -69,16 +69,6 @@ export const myPairsResponseSchema = z.object({
 });
 export type MyPairsResponse = z.infer<typeof myPairsResponseSchema>;
 
-/**
- * 재사용 가능한 "내 소개 링크" 생성/조회 요청. `pair_invites`와 달리 특정
- * 상대를 지정하지 않는다 — 참여자당 하나만 있고 여러 사람이 같은 링크로
- * 들어올 수 있다.
- */
-export const createReferralLinkSchema = z.object({
-  nickname: z.string().max(20).optional(),
-});
-export type CreateReferralLinkInput = z.infer<typeof createReferralLinkSchema>;
-
 /** owner가 자기 링크로 들어온 방문자 한 명과의 결과를 다시 볼 때. */
 export const referralVisitSchema = z.object({
   nickname: z.string().nullable(),
@@ -87,18 +77,18 @@ export const referralVisitSchema = z.object({
 });
 export type ReferralVisit = z.infer<typeof referralVisitSchema>;
 
+/**
+ * 재사용 가능한 "내 소개 링크". `pair_invites`와 달리 특정 상대를 지정하지
+ * 않는다 — 참여자당 하나만 있고 여러 사람이 같은 링크로 들어올 수 있다.
+ * 링크에는 owner를 식별할 수 있는 정보를 아무것도 담지 않는다(닉네임 없음)
+ * — 링크는 보통 카톡/DM/커뮤니티 게시글 등 바깥 맥락에서 누구의 링크인지
+ * 이미 알려진 채로 공유된다.
+ */
 export const referralLinkSchema = z.object({
   token: z.string(),
-  nickname: z.string().nullable(),
   visits: z.array(referralVisitSchema),
 });
 export type ReferralLink = z.infer<typeof referralLinkSchema>;
-
-/** `GET /api/r/{token}` 응답 — 방문자에게 보여줄 최소 정보만. */
-export const referralLandingSchema = z.object({
-  nickname: z.string().nullable(),
-});
-export type ReferralLanding = z.infer<typeof referralLandingSchema>;
 
 /**
  * `POST /api/r/{token}/result` 요청 — nickname은 방문자가 owner에게

@@ -4,7 +4,6 @@ import { getDb, referralLinks, referralVisits } from "@gai-ara/db";
 
 export interface ReferralLinkRecord {
   token: string;
-  nickname: string | null;
 }
 
 export interface ReferralVisitRecord {
@@ -13,44 +12,36 @@ export interface ReferralVisitRecord {
   distance: number | null;
 }
 
-/**
- * 참여자의 재사용 가능한 링크를 가져오거나(없으면) 만든다.
- * nickname을 넘기면 기존 링크의 닉네임도 갱신한다 — 생략하면 그대로 둔다.
- */
+/** 참여자의 재사용 가능한 링크를 가져오거나(없으면) 만든다. */
 export async function getOrCreateReferralLink(
   ownerParticipantId: string,
-  nickname?: string,
 ): Promise<ReferralLinkRecord> {
   const db = getDb();
   const token = randomBytes(16).toString("hex");
-  const trimmedNickname = nickname?.trim() || null;
 
   const [row] = await db
     .insert(referralLinks)
-    .values({ ownerParticipantId, token, nickname: trimmedNickname })
+    .values({ ownerParticipantId, token })
     .onConflictDoUpdate({
       target: referralLinks.ownerParticipantId,
-      // nickname을 새로 안 넘겼으면(undefined) 기존 값을 유지한다.
-      set: nickname !== undefined
-        ? { nickname: trimmedNickname }
-        : { ownerParticipantId: sql`${referralLinks.ownerParticipantId}` },
+      set: { ownerParticipantId: sql`${referralLinks.ownerParticipantId}` },
     })
-    .returning({ token: referralLinks.token, nickname: referralLinks.nickname });
+    .returning({ token: referralLinks.token });
 
   if (!row) throw new Error("referral link upsert returned no row");
   return row;
 }
 
-/** 토큰으로 링크의 표시용 닉네임만 가져온다(존재 확인 겸용). */
-export async function getReferralLinkNickname(token: string): Promise<{ nickname: string | null } | null> {
+/** 토큰으로 링크가 존재하는지만 확인한다. */
+export async function referralLinkExists(token: string): Promise<boolean> {
   const db = getDb();
   const [row] = await db
-    .select({ nickname: referralLinks.nickname })
+    .select({ token: referralLinks.token })
     .from(referralLinks)
     .where(eq(referralLinks.token, token))
     .limit(1);
 
-  return row ?? null;
+  return row !== undefined;
 }
 
 /**
@@ -76,7 +67,7 @@ export async function getReferralLinkForParticipant(
 ): Promise<ReferralLinkRecord | null> {
   const db = getDb();
   const [row] = await db
-    .select({ token: referralLinks.token, nickname: referralLinks.nickname })
+    .select({ token: referralLinks.token })
     .from(referralLinks)
     .where(eq(referralLinks.ownerParticipantId, ownerParticipantId))
     .limit(1);

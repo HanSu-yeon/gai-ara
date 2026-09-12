@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { UploadFlow } from "@/components/UploadFlow";
 import { GuideChecklist } from "@/components/UploadGuide";
-import { Icon } from "@/components/Brand";
+import { BrandHeader, Character, Icon } from "@/components/Brand";
 import { trackEvent } from "@/lib/analytics";
-import { clearImportProgress, importSource, markExportOpened, markFileStepOpened, readImportProgress, saveImportProgress } from "@/lib/import-progress";
+import { importSource, markExportOpened, markFileStepOpened, readImportProgress, saveImportProgress, clearImportProgress, type ImportProgress } from "@/lib/import-progress";
 
 const INSTAGRAM_EXPORT_URL = "https://accountscenter.instagram.com/info_and_permissions/dyi?source=external&account_type=1&format=JSON&date_range=ALL_TIME";
 
@@ -15,7 +15,7 @@ export function ConnectionExample() {
   return <section className="connection-example" aria-label="연결 예시">
     <span className="explainer-eyebrow">예시 · 실제 결과가 아니에요</span>
     <p className="example-path"><span>나</span><b aria-hidden="true">→</b><span>친구</span><b aria-hidden="true">→</b><span>상대방</span></p>
-    <strong>친구 한 명을 건너면, 2다리 사이</strong>
+    <strong>친구 한 명을 건너면, 한 다리 건너 아는 사이</strong>
     <p>참여한 사람들의 맞팔 연결로 몇 다리인지 알아봐요.<br />실제 결과에는 중간 사람의 이름이 나오지 않아요.</p>
   </section>;
 }
@@ -58,12 +58,16 @@ export function ImportOnboarding({ onUploaded }: { onUploaded: () => void | Prom
       <p className="status-caption">연결 확인에는 인스타에서 받은 데이터가 필요해요.</p>
     </> : !readyToUpload ? <>
       <h2 className="import-title">인스타 데이터 가져오기</h2>
-      <p className="subtitle">Instagram에서 팔로워 및 팔로잉 데이터만<br />JSON 형식·전체 기간으로 요청해주세요.</p>
+      <div className="export-checklist">
+        <p className="export-checklist-title">이것만 선택하면 돼요</p>
+        <p>일부 정보 → <strong>팔로워 및 팔로잉</strong></p>
+        <p>형식 → <strong>JSON</strong></p>
+      </div>
       <a className="primary-button mt-6" href={INSTAGRAM_EXPORT_URL} target="_blank" rel="noreferrer" onClick={() => {
         markExportOpened(path);
         setReadyToUpload(true);
         trackEvent("instagram_export_open", { source });
-      }}>인스타 데이터 요청하기 <Icon name="arrow" /></a>
+      }}>인스타에서 받기 <Icon name="arrow" /></a>
       <button type="button" className="guide-button" onClick={continueToFile}>이미 받은 파일이 있어요</button>
       <button type="button" className="guide-button" aria-expanded={guideOpen} aria-controls="import-guide" onClick={() => {
         if (!guideOpen) {
@@ -95,6 +99,60 @@ export function ImportOnboarding({ onUploaded }: { onUploaded: () => void | Prom
   </section>;
 }
 
+/**
+ * 홈에 다시 들어왔을 때 "인스타에서 파일 받으셨나요?" 화면으로 곧장 맞이한다.
+ * 인스타 export 처리는 몇 분~며칠까지 걸릴 수 있어서, 그 사이 사용자가
+ * 서비스 이름 자체를 잊어버려도 다시 도메인만 치면 이 화면이 붙잡아준다 —
+ * 작은 배너(ResumeImport)로는 놓치기 쉬워서, 내보내기까지 이미 다녀온
+ * 상태(fileStepOpenedAt)라면 랜딩 대신 이 화면으로 완전히 대체한다.
+ */
+export function ImportReturnGate({ children }: { children: ReactNode }) {
+  // localStorage는 서버에서 읽을 수 없어서, 처음엔 항상 children(랜딩)으로
+  // 그린다 — 대다수인 첫 방문자는 깜빡임 없이 바로 보이고, 복귀 중인
+  // 소수만 마운트 직후 이 화면으로 잠깐 전환된다.
+  const [progress, setProgress] = useState<ImportProgress | null>(null);
+
+  useEffect(() => {
+    const saved = readImportProgress();
+    setProgress(saved);
+    if (saved?.fileStepOpenedAt && saved.exportOpenedAt) {
+      trackEvent("import_return_shown", {
+        source: importSource(saved.path),
+        seconds_since_export_open: Math.max(0, Math.floor((Date.now() - saved.exportOpenedAt) / 1000)),
+      });
+    }
+  }, []);
+
+  if (!progress?.fileStepOpenedAt) return <>{children}</>;
+  const source = importSource(progress.path);
+
+  return (
+    <main className="brand-page">
+      <BrandHeader />
+      <Character kind="heart" className="result-character" />
+      <h1 className="upload-heading">인스타 파일<br /><em>받으셨나요?</em></h1>
+      <p className="subtitle">받았다면 압축을 풀지 말고<br />그대로 가져오면 돼요.</p>
+      <Link href={progress.path} className="primary-button mt-6" onClick={() => trackEvent("import_return_continue", { source })}>
+        파일 가져오기 <Icon name="arrow" />
+      </Link>
+      <a href={INSTAGRAM_EXPORT_URL} target="_blank" rel="noreferrer" className="text-link text-xs mt-4" onClick={() => trackEvent("import_return_recheck", { source })}>
+        아직 안 왔어요 · 받는 곳 다시 보기
+      </a>
+      <button type="button" className="text-link text-xs mt-4" onClick={() => {
+        trackEvent("import_return_reset", { source });
+        clearImportProgress(progress.path);
+        setProgress(null);
+      }}>
+        처음부터 다시 할게요
+      </button>
+    </main>
+  );
+}
+
+/**
+ * fileStepOpenedAt이 있는 경우는 ImportReturnGate가 먼저 화면 전체를
+ * 가로채므로, 여기까지 내려오는 건 항상 그보다 이른 단계다.
+ */
 export function ResumeImport() {
   const [progress, setProgress] = useState<ReturnType<typeof readImportProgress>>(null);
   useEffect(() => { setProgress(readImportProgress()); }, []);
@@ -102,6 +160,6 @@ export function ResumeImport() {
   return <Link className="guide-button" href={progress.path} onClick={() => {
     trackEvent("import_resume_click", { source: importSource(progress.path), entry: "home" });
   }}>
-    {progress.fileStepOpenedAt ? "인스타 파일 받으셨나요? 이어서 확인하기" : "인스타 데이터 가져오기 이어서 하기"} <Icon name="arrow" />
+    인스타 데이터 가져오기 이어서 하기 <Icon name="arrow" />
   </Link>;
 }
