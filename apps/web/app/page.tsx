@@ -23,6 +23,6 @@ export default function LandingPage() {
     </section>
     <section id="about" className="about-card"><Character kind="search" /><div><span className="handwritten">가이 알아?</span><p>친구의 친구를 따라가다 보면<br />생각보다 가까운 사이일지도 몰라요.</p></div></section>
     <Link href="/upload/guide" className="guide-button">데이터 받는 법 보기 <Icon name="arrow" /></Link>
-    <Link href="/privacy" className="text-link text-xs mt-3">개인정보처리방침</Link>
+    <Link href="/privacy" className="footer-link">개인정보처리방침</Link>
   </main>;
 }

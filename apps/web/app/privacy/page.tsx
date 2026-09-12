@@ -1,8 +1,8 @@
 import { BrandHeader } from "@/components/Brand";
 
 const CONTACT_EMAIL = "hansuyeon.dev@gmail.com";
-const DELETE_MAILTO = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("[가이 알아?] 내 정보 삭제 요청")}&body=${encodeURIComponent(
-  "아래 정보를 알려주시면 확인 후 삭제해드릴게요.\n\n- Instagram 아이디: \n- (또는) 내 결과 저장 링크(/result/로 시작하는 링크): \n",
+const CONTACT_MAILTO = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("[가이 알아?] 문의")}&body=${encodeURIComponent(
+  "삭제를 원하시면 아래 정보를 알려주세요. 다른 문의는 자유롭게 적어주셔도 돼요.\n\n- Instagram 아이디: \n- (또는) 내 결과 저장 링크(/result/로 시작하는 링크): \n",
 )}`;
 
 export const metadata = { title: "개인정보처리방침 · 가이 알아?" };
@@ -55,10 +55,7 @@ export default function PrivacyPolicyPage() {
           아래 이메일로 Instagram 아이디 또는 내 결과 저장 링크를 보내주시면,
           본인 확인 후 처리하고 결과를 안내합니다.
         </p>
-        <p>
-          <a className="text-link" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
-        </p>
-        <a className="primary-button mt-6" href={DELETE_MAILTO}>내 정보 삭제 요청하기</a>
+        <a className="guide-button mt-6" href={CONTACT_MAILTO}>문의·삭제 요청은 이메일로</a>
       </article>
     </main>
   );

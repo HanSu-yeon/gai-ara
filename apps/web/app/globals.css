@@ -207,6 +207,8 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .privacy-page .subtitle { text-align: left; margin: 4px 0 28px; }
 .privacy-page h2 { margin: 28px 0 10px; font-size: 17px; font-weight: 700; color: #18563a; }
 .privacy-page p, .privacy-page li { font-size: 14px; line-height: 1.8; color: #4a4640; }
+
+.footer-link { display: block; margin-top: 32px; font-size: 12px; font-weight: 400; color: #9a968c; }
 .privacy-page ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
 .privacy-page .primary-button { display: inline-flex; }
 .privacy-page a.text-link { text-decoration: underline; }
