@@ -15,7 +15,7 @@ export function Character({ kind = "wave", className = "" }: { kind?: "wave" | "
 export function Steps({ active }: { active: number }) {
   return <ol className="steps">{["파일 업로드", "분석 중", "결과 확인"].map((label, i) => <li key={label} className={active === i ? "active" : ""} aria-current={active === i ? "step" : undefined}><span>{i + 1}</span>{label}</li>)}</ol>;
 }
-export function PrivacyNote() { return <div className="privacy-note"><Icon name="lock" /><div><strong>연결 계산에 필요한 정보만 사용해요.</strong></div></div>; }
+export function PrivacyNote() { return <div className="privacy-note"><Icon name="lock" /><div><strong>연결 계산에 필요한 정보만 사용해요.</strong><br /><Link className="text-link text-xs" href="/privacy">개인정보처리방침 보기</Link></div></div>; }
 
 /** pair 결과·소개 링크 결과처럼 "가운데 정렬 + 캐릭터 + 상태 텍스트" 화면에서 공용으로 쓴다. */
 export function Centered({

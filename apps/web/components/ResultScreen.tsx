@@ -143,6 +143,7 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
         <p className="result-note mt-4">이 링크를 저장해두면 다른 기기나 브라우저에서도 내 결과를 다시 볼 수 있어요.</p>
         <div className="invite-box"><input aria-label="내 결과 저장 링크" value={`${typeof window !== "undefined" ? window.location.origin : ""}/result/${result.recoveryToken}`} readOnly onFocus={(event) => event.target.select()} /><button onClick={handleCopyRecoveryLink}>{recoveryCopied ? "복사했어요!" : "복사하기"}</button></div>
         {recoveryError && <p className="error-message" role="alert">{recoveryError}</p>}
+        <p className="result-note mt-4">내 정보를 지우고 싶다면 <Link href="/privacy" className="text-link">개인정보처리방침</Link>에서 삭제를 요청할 수 있어요.</p>
       </section>
 </>}
   </main>;

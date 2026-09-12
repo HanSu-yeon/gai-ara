@@ -63,7 +63,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             window.dataLayer = window.dataLayer || [];
             function gtag(){window.dataLayer.push(arguments);}
             gtag('js', new Date());
-            gtag('config', '${GA_MEASUREMENT_ID}');
+            // Only send known page categories, never tokens or query strings.
+            var section = window.location.pathname.split('/')[1];
+            var pages = ['upload', 'result', 'r', 'pair', 'connections', 'privacy', 'preview'];
+            var safePath = pages.includes(section) ? '/' + section : '/';
+            gtag('config', '${GA_MEASUREMENT_ID}', {
+              page_location: '${SITE_URL}' + safePath,
+              page_referrer: '',
+              allow_google_signals: false,
+              allow_ad_personalization_signals: false
+            });
           `}
         </Script>
         <div className="brand-shell">{children}</div>
