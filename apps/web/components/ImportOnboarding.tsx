@@ -20,10 +20,15 @@ export function ConnectionExample() {
   </section>;
 }
 
-export function ImportOnboarding({ onUploaded }: { onUploaded: () => void | Promise<void> }) {
+export function ImportOnboarding({ onUploaded, initiallyStarted = false }: {
+  onUploaded: () => void | Promise<void>;
+  /** 부모가 이미 자체 티저 화면(예: 소개 링크 랜딩)으로 "왜"를 보여준 뒤 호출하는 경우, 여기서
+   * 또 ConnectionExample + 시작 버튼을 반복하지 않고 곧장 체크리스트 단계로 들어간다. */
+  initiallyStarted?: boolean;
+}) {
   const path = usePathname();
   const source = importSource(path);
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(initiallyStarted);
   const [guideOpen, setGuideOpen] = useState(false);
   const [resumed, setResumed] = useState(false);
   const [readyToUpload, setReadyToUpload] = useState(false);
@@ -35,10 +40,12 @@ export function ImportOnboarding({ onUploaded }: { onUploaded: () => void | Prom
       setStarted(true);
       setResumed(true);
       setReadyToUpload(Boolean(saved.fileStepOpenedAt));
+    } else if (initiallyStarted) {
+      saveImportProgress(path);
     }
     const agent = navigator.userAgent;
     setDevice(/iPad|iPhone|iPod/.test(agent) ? "ios" : /Android/i.test(agent) ? "android" : "other");
-  }, [path]);
+  }, [path, initiallyStarted]);
 
   function start() {
     saveImportProgress(path);
@@ -57,17 +64,19 @@ export function ImportOnboarding({ onUploaded }: { onUploaded: () => void | Prom
       <button type="button" className="primary-button" onClick={start}>내 연결 알아보기 <Icon name="arrow" /></button>
       <p className="status-caption">연결 확인에는 인스타에서 받은 데이터가 필요해요.</p>
     </> : !readyToUpload ? <>
-      <h2 className="import-title">인스타 데이터 가져오기</h2>
+      <h2 className="import-title">이것만 기억하세요</h2>
       <div className="export-checklist">
-        <p className="export-checklist-title">이것만 선택하면 돼요</p>
+        <p className="export-checklist-title">인스타에서 이것만 선택해주세요</p>
         <p>일부 정보 → <strong>팔로워 및 팔로잉</strong></p>
+        <p>기간 → <strong>전체 기간</strong></p>
         <p>형식 → <strong>JSON</strong></p>
       </div>
       <a className="primary-button mt-6" href={INSTAGRAM_EXPORT_URL} target="_blank" rel="noreferrer" onClick={() => {
         markExportOpened(path);
         setReadyToUpload(true);
         trackEvent("instagram_export_open", { source });
-      }}>인스타에서 받기 <Icon name="arrow" /></a>
+      }}>받으러 가기 <Icon name="arrow" /></a>
+      <p className="status-caption">파일이 준비되면 인스타에서 알려줘요.</p>
       <button type="button" className="guide-button" onClick={continueToFile}>이미 받은 파일이 있어요</button>
       <button type="button" className="guide-button" aria-expanded={guideOpen} aria-controls="import-guide" onClick={() => {
         if (!guideOpen) {
@@ -81,13 +90,12 @@ export function ImportOnboarding({ onUploaded }: { onUploaded: () => void | Prom
         <GuideChecklist />
       </section>}
     </> : <>
-      <h2 className="import-title">받은 파일 선택하기</h2>
-      <p className="subtitle">Instagram에서 준비 완료 알림을 받으면<br />아래 버튼으로 다시 들어가 ZIP을 내려받아주세요.</p>
-      <a className="primary-button mt-6" href={INSTAGRAM_EXPORT_URL} target="_blank" rel="noreferrer" onClick={() => {
+      <h2 className="import-title">파일 받았어요?</h2>
+      <p className="subtitle">압축 풀지 말고<br />받은 파일 그대로 가져오면 돼요.</p>
+      <a className="text-link text-xs mt-4" href={INSTAGRAM_EXPORT_URL} target="_blank" rel="noreferrer" onClick={() => {
         markExportOpened(path);
         trackEvent("instagram_export_reopen", { source });
-      }}>인스타에서 준비된 파일 받기 <Icon name="arrow" /></a>
-      <p className="status-caption">다운로드가 끝나면 이 화면으로 돌아와 아래에서 파일을 선택해주세요.</p>
+      }}>아직 안 왔어요 · 받는 곳 다시 보기</a>
       {device === "ios" && <p className="file-location-hint">iPhone: 파일 앱 → 다운로드에서 찾아보세요.</p>}
       {device === "android" && <p className="file-location-hint">Android: 내 파일 → Download에서 찾아보세요.</p>}
       {resumed && <p className="resume-note" role="status">기다려주셔서 고마워요. 여기서 이어서 확인할 수 있어요.</p>}

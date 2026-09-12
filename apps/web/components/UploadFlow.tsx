@@ -92,7 +92,7 @@ export function UploadFlow({ onUploaded, source = "direct" }: UploadFlowProps) {
       ...(exportOpenedAt ? { seconds_since_export_open: Math.max(0, Math.floor((Date.now() - exportOpenedAt) / 1000)) } : {}) });
     if (!selected.name.toLowerCase().endsWith(".zip")) {
       setFile(null);
-      setError("인스타에서 받은 압축 파일(.zip)을 그대로 선택해주세요.");
+      setError("인스타에서 받은 파일이 맞는지 확인해주세요.");
       return;
     }
     setFile(selected);

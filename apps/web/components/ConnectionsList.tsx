@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { MyPairSummary, ReferralVisit } from "@gai-ara/shared";
 import { BrandHeader, Character, Icon } from "@/components/Brand";
-import { formatConnectionPhrase } from "@/lib/distance-copy";
+import { formatConnectionDiagram, formatConnectionPhrase } from "@/lib/distance-copy";
 
 function statusLabel(pair: MyPairSummary): string {
   if (pair.status === "pending") return "상대방을 기다리는 중";
@@ -44,6 +44,8 @@ export function ConnectionsList() {
 
   if (selectedVisit) {
     const connected = selectedVisit.status === "connected";
+    const distance = selectedVisit.distance ?? 1;
+    const visitorLabel = selectedVisit.nickname ?? "이름 없는 방문자";
     return (
       <main className="brand-page">
         <header className="brand-header center-logo">
@@ -53,9 +55,21 @@ export function ConnectionsList() {
           <img className="brand-logo" src="/assets/gai-ara_logo.png" alt="가이 알아?" />
         </header>
         <Character kind={connected ? "wave" : "curious"} className="result-character" />
-        <p className="pair-result-kicker">{selectedVisit.nickname ?? "이름 없는 방문자"}님과</p>
-        <p className="pair-result-title">{connected ? formatConnectionPhrase(selectedVisit.distance ?? 1) : "아직 이어지는 길을 못 찾았어요"}</p>
-        {connected && <p className="pair-result-kicker">예요!</p>}
+        {!connected ? (
+          <p className="pair-result-title">아직 이어지는 길을 못 찾았어요</p>
+        ) : distance <= 1 ? (
+          <>
+            <p className="pair-result-title">{visitorLabel}과 이미 바로 아는 사이네요</p>
+            <p className="pair-result-kicker">다른 사람을 거치지 않고<br />바로 연결되어 있어요.</p>
+          </>
+        ) : (
+          <>
+            <p className="pair-result-kicker">{visitorLabel}님과</p>
+            <p className="pair-result-title">{formatConnectionPhrase(distance)}</p>
+            <p className="connection-diagram" aria-hidden="true">{formatConnectionDiagram(distance)}</p>
+            <p className="pair-result-kicker">둘 사이에 {distance - 1}명의 지인이 이어져 있어요.</p>
+          </>
+        )}
       </main>
     );
   }

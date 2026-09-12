@@ -6,7 +6,7 @@ import type { PairResult } from "@gai-ara/shared";
 import { ImportOnboarding } from "@/components/ImportOnboarding";
 import { BrandHeader, Character, Centered, StatusMessage } from "@/components/Brand";
 import { UnreachableResult } from "@/components/UnreachableResult";
-import { formatConnectionPhrase } from "@/lib/distance-copy";
+import { formatConnectionDiagram, formatConnectionPhrase } from "@/lib/distance-copy";
 import { trackEvent } from "@/lib/analytics";
 import { clearImportProgress } from "@/lib/import-progress";
 
@@ -107,14 +107,23 @@ export default function LivePairPage() {
 
   if (pairResult) {
     if (pairResult.status === "unreachable") return <UnreachableResult />;
+    const distance = pairResult.distance ?? 1;
     return (
       <Centered character={pairResult.status === "connected" ? "wave" : "heart"}>
         {pairResult.status === "connected" && (
-          <>
-            <p className="pair-result-kicker">우리는</p>
-            <p className="pair-result-title">{formatConnectionPhrase(pairResult.distance ?? 1)}</p>
-            <p className="pair-result-kicker">예요!</p>
-          </>
+          distance <= 1 ? (
+            <>
+              <p className="pair-result-title">이미 바로 아는 사이네요</p>
+              <p className="pair-result-kicker">다른 사람을 거치지 않고<br />바로 연결되어 있어요.</p>
+            </>
+          ) : (
+            <>
+              <p className="pair-result-kicker">우리는</p>
+              <p className="pair-result-title">{formatConnectionPhrase(distance)}</p>
+              <p className="connection-diagram" aria-hidden="true">{formatConnectionDiagram(distance)}</p>
+              <p className="pair-result-kicker">예요! 둘 사이에 {distance - 1}명의 지인이 이어져 있어요.</p>
+            </>
+          )
         )}
         {pairResult.status === "pending" && (
           <StatusMessage>상대방의 참여를 기다리고 있어요.</StatusMessage>

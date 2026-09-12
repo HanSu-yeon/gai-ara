@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { ReferralResult } from "@gai-ara/shared";
 import { ImportOnboarding } from "@/components/ImportOnboarding";
-import { BrandHeader, Character, Centered, StatusMessage } from "@/components/Brand";
+import { BrandHeader, Character, Centered, Icon, StatusMessage } from "@/components/Brand";
 import { UnreachableResult } from "@/components/UnreachableResult";
 import { formatConnectionPhrase, formatConnectionDiagram } from "@/lib/distance-copy";
 import { trackEvent } from "@/lib/analytics";
@@ -32,6 +32,9 @@ export function ReferralLanding() {
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [visitorNickname, setVisitorNickname] = useState("");
+  // 다운로드 방법을 먼저 설명하면 이탈률이 높아서, "몇 명을 거치면 닿을까?" 티저부터
+  // 보여주고 이 버튼을 눌러야만 그 아래 실제 절차(로그인 확인/파일 가져오기)가 열린다.
+  const [began, setBegan] = useState(false);
 
   useEffect(() => {
     fetch("/api/session")
@@ -123,27 +126,35 @@ export function ReferralLanding() {
     <main className="brand-page">
       <BrandHeader home />
       <Character kind="wave" className="result-character" />
-      <h1 className="upload-heading">
-        나와 이 링크를 만든 사람 사이,<br />몇 명의 지인을 거치면 닿을까요?
-      </h1>
-      <p className="connection-diagram" aria-hidden="true">나 ─ ● ─ ● ─ 상대</p>
-      <p className="subtitle">우리 사이를 이어주는 사람이<br />몇 명인지 찾아봐요.</p>
-      <input className="username-input mb-3 mt-6" value={visitorNickname} onChange={(event) => setVisitorNickname(event.target.value)}
-        placeholder="내 닉네임 (선택, 상대방에게 보여요)" maxLength={20} aria-label="내 닉네임" />
-      {hasSession && !wantsReupload ? (
+      {!began ? (
         <>
-          <p className="subtitle">이미 참여하셨네요. 이 정보로 바로 확인할까요?</p>
-          <button type="button" className="primary-button mt-4" onClick={handleQuickConfirm} disabled={confirming}>
-            {confirming ? "확인하는 중…" : "바로 확인하기"}
-          </button>
-          {confirmError && <p className="error-message" role="alert">{confirmError}</p>}
-          <button type="button" className="text-link text-xs mt-4" onClick={() => setWantsReupload(true)}>
-            다른 파일로 다시 올릴래요
-          </button>
+          <h1 className="upload-heading">
+            나와 상대 사이, 몇 명의<br />지인을 거치면 닿을까요?
+          </h1>
+          <p className="connection-diagram" aria-hidden="true">나 ─ ● ─ ● ─ 상대</p>
+          <button type="button" className="primary-button mt-6" onClick={() => {
+            setBegan(true);
+            trackEvent("referral_teaser_start");
+          }}>연결 확인하기 <Icon name="arrow" /></button>
         </>
       ) : (
         <>
-          <ImportOnboarding onUploaded={handleUploaded} />
+          <input className="username-input mb-3 mt-6" value={visitorNickname} onChange={(event) => setVisitorNickname(event.target.value)}
+            placeholder="내 닉네임 (선택, 상대방에게 보여요)" maxLength={20} aria-label="내 닉네임" />
+          {hasSession && !wantsReupload ? (
+            <>
+              <p className="subtitle">이미 참여하셨네요. 이 정보로 바로 확인할까요?</p>
+              <button type="button" className="primary-button mt-4" onClick={handleQuickConfirm} disabled={confirming}>
+                {confirming ? "확인하는 중…" : "바로 확인하기"}
+              </button>
+              {confirmError && <p className="error-message" role="alert">{confirmError}</p>}
+              <button type="button" className="text-link text-xs mt-4" onClick={() => setWantsReupload(true)}>
+                다른 파일로 다시 올릴래요
+              </button>
+            </>
+          ) : (
+            <ImportOnboarding initiallyStarted onUploaded={handleUploaded} />
+          )}
         </>
       )}
     </main>
