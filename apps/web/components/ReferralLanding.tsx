@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import type { ReferralResult } from "@gai-ara/shared";
 import { ImportOnboarding } from "@/components/ImportOnboarding";
 import { BrandHeader, Character, Centered, Icon, StatusMessage } from "@/components/Brand";
@@ -125,20 +126,22 @@ export function ReferralLanding() {
   return (
     <main className="brand-page">
       <BrandHeader home />
-      <Character kind="wave" className="result-character" />
       {!began ? (
         <>
+          <div className="referral-teaser-art">
+            <Image src="/assets/curious.png" alt="서로를 궁금해하는 두 귤 캐릭터" width={1774} height={887} sizes="470px" />
+          </div>
           <h1 className="upload-heading">
-            나와 상대 사이, 몇 명의<br />지인을 거치면 닿을까요?
+            우리, 몇 다리 건너<br />아는 사이일까?
           </h1>
-          <p className="connection-diagram" aria-hidden="true">나 ─ ● ─ ● ─ 상대</p>
           <button type="button" className="primary-button mt-6" onClick={() => {
             setBegan(true);
             trackEvent("referral_teaser_start");
-          }}>연결 확인하기 <Icon name="arrow" /></button>
+          }}>우리 연결 확인하기 <Icon name="arrow" /></button>
         </>
       ) : (
         <>
+          <Character kind="wave" className="result-character" />
           <input className="username-input mb-3 mt-6" value={visitorNickname} onChange={(event) => setVisitorNickname(event.target.value)}
             placeholder="내 닉네임 (선택, 상대방에게 보여요)" maxLength={20} aria-label="내 닉네임" />
           {hasSession && !wantsReupload ? (
