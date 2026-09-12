@@ -21,6 +21,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: SHARE_TITLE,
   description: SHARE_DESCRIPTION,
+  keywords: ["가이 알아", "인스타 맞팔", "제주", "몇 다리", "소셜 그래프", "인스타그램 친구"],
+  alternates: { canonical: "/" },
+  robots: { index: true, follow: true },
+  // TODO: Google Search Console(search.google.com/search-console)에서 사이트를
+  // 등록하면 발급되는 인증 코드를 google에 넣는다.
+  verification: {
+    other: { "naver-site-verification": "50274556ac95993525fb0e36fa8b9088879b8535" },
+  },
   openGraph: {
     title: SHARE_TITLE,
     description: SHARE_DESCRIPTION,
