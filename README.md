@@ -25,6 +25,8 @@ packages/
 - **DB**: PostgreSQL + Drizzle ORM (스펙 10장 권장대로 별도 그래프 DB 없이 시작).
 - **ZIP 파싱**: JSZip, 브라우저에서 실행 (서버로 원본 데이터를 보내지 않기 위해).
 - **검증**: Vitest (`ig-parser`, `graph` 패키지에 핵심 로직 단위 테스트).
+- **제품 결정 로그**: 진입 비용, 데이터 가져오기와 퍼널에 관한 결정은
+  [`docs/01_Concept_Design/00_PRODUCT_DECISION_LOG.md`](./docs/01_Concept_Design/00_PRODUCT_DECISION_LOG.md)에 기록한다.
 
 ## 개인정보/보안 설계에서 반드시 지킬 것
 

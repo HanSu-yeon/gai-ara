@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import type { ReferralResult } from "@gai-ara/shared";
-import { UploadFlow } from "@/components/UploadFlow";
-import { BrandHeader, Character, Centered, Icon, StatusMessage } from "@/components/Brand";
+import { ImportOnboarding } from "@/components/ImportOnboarding";
+import { BrandHeader, Character, Centered, StatusMessage } from "@/components/Brand";
 import { UnreachableResult } from "@/components/UnreachableResult";
 import { formatConnectionPhrase } from "@/lib/distance-copy";
 import { trackEvent } from "@/lib/analytics";
+import { clearImportProgress } from "@/lib/import-progress";
 
 type LinkStatus = "loading" | "not-found" | "ready";
 
@@ -54,6 +54,10 @@ export function ReferralLanding() {
       .catch(() => setLinkStatus("not-found"));
   }, [token]);
 
+  useEffect(() => {
+    if (linkStatus === "not-found") clearImportProgress(`/r/${token}`);
+  }, [linkStatus, token]);
+
   async function loadResult() {
     const response = await fetch(`/api/r/${token}/result`, {
       method: "POST",
@@ -79,6 +83,7 @@ export function ReferralLanding() {
     setConfirmError(null);
     try {
       await loadResult();
+      clearImportProgress(`/r/${token}`);
     } catch (err) {
       setConfirmError(err instanceof Error ? err.message : "확인하지 못했어요. 다시 시도해주세요.");
     } finally {
@@ -131,10 +136,7 @@ export function ReferralLanding() {
         </>
       ) : (
         <>
-          <UploadFlow onUploaded={handleUploaded} />
-          <Link href="/upload/guide" className="guide-button">
-            데이터 받는 법 보기 <Icon name="arrow" />
-          </Link>
+          <ImportOnboarding onUploaded={handleUploaded} />
         </>
       )}
     </main>

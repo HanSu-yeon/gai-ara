@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import type { PairResult } from "@gai-ara/shared";
-import { UploadFlow } from "@/components/UploadFlow";
-import { BrandHeader, Character, Centered, Icon, StatusMessage } from "@/components/Brand";
+import { ImportOnboarding } from "@/components/ImportOnboarding";
+import { BrandHeader, Character, Centered, StatusMessage } from "@/components/Brand";
 import { UnreachableResult } from "@/components/UnreachableResult";
 import { formatConnectionPhrase } from "@/lib/distance-copy";
 import { trackEvent } from "@/lib/analytics";
+import { clearImportProgress } from "@/lib/import-progress";
 
 type InviteStatus = "pending" | "accepted" | "expired" | "not-found";
 
@@ -55,6 +55,10 @@ export default function LivePairPage() {
       .catch(() => setInviteStatus("not-found"));
   }, [token]);
 
+  useEffect(() => {
+    if (inviteStatus === "not-found" || inviteStatus === "expired") clearImportProgress(`/pair/${token}`);
+  }, [inviteStatus, token]);
+
   async function handleUploaded() {
     const accepted = await fetch(`/api/invites/${token}/accept`, { method: "POST" });
     if (accepted.status === 410) {
@@ -85,6 +89,7 @@ export default function LivePairPage() {
     setConfirmError(null);
     try {
       await handleUploaded();
+      clearImportProgress(`/pair/${token}`);
     } catch (err) {
       setConfirmError(err instanceof Error ? err.message : "확인하지 못했어요. 다시 시도해주세요.");
     } finally {
@@ -145,10 +150,7 @@ export default function LivePairPage() {
         </>
       ) : (
         <>
-          <UploadFlow onUploaded={handleUploaded} />
-          <Link href="/upload/guide" className="guide-button">
-            데이터 받는 법 보기 <Icon name="arrow" />
-          </Link>
+          <ImportOnboarding onUploaded={handleUploaded} />
         </>
       )}
     </main>

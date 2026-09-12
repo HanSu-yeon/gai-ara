@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { ResumeImport } from "@/components/ImportOnboarding";
 import { BrandHeader, Character, Icon } from "@/components/Brand";
 
 export default function LandingPage() {
   return <main className="brand-page landing-page">
     <BrandHeader />
+    <ResumeImport />
     <section className="landing-hero">
       <h1>제주,<br /><em>몇 다리</em> 건너면<br />다 아는 사이일까?</h1>
       <p className="subtitle">생각보다, 우리는 가까이 연결되어 있어요.</p>

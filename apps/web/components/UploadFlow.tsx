@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Character, ConnectionSearchArt, Icon, PrivacyNote, Steps } from "@/components/Brand";
+import { ConnectionSearchArt, Icon, PrivacyNote, Steps } from "@/components/Brand";
 import { InstagramExportParseError, parseFollowingFromZip, suggestUsernameFromFilename } from "@gai-ara/ig-parser";
 import { trackEvent } from "@/lib/analytics";
+import { readImportProgress, type ImportSource } from "@/lib/import-progress";
 
 type Status = "idle" | "parsing" | "uploading" | "error";
 
 interface UploadFlowProps {
+  source?: ImportSource;
   onUploaded: () => void | Promise<void>;
 }
 
@@ -22,7 +24,7 @@ function formatFileSize(bytes: number): string {
  * followers는 아예 받지 않는다 — 맞팔 여부는 서버가 두 참여자의 following을
  * 대조해서 판정한다.
  */
-export function UploadFlow({ onUploaded }: UploadFlowProps) {
+export function UploadFlow({ onUploaded, source = "direct" }: UploadFlowProps) {
   const [selfUsername, setSelfUsername] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("idle");
@@ -38,10 +40,11 @@ export function UploadFlow({ onUploaded }: UploadFlowProps) {
       return;
     }
     if (!file) {
-      setError("Instagram에서 받은 ZIP 파일을 선택해주세요.");
+      setError("인스타에서 받은 파일을 선택해주세요.");
       return;
     }
 
+    let uploaded = false;
     try {
       setStatus("parsing");
       const followingUsernames = await parseFollowingFromZip(file, selfUsername);
@@ -58,12 +61,14 @@ export function UploadFlow({ onUploaded }: UploadFlowProps) {
         throw new Error(typeof failure?.error === "string" ? failure.error : "업로드에 실패했어요. 잠시 후 다시 시도해주세요.");
       }
 
-      trackEvent("upload_success");
+      uploaded = true;
+      trackEvent("upload_success", { source });
+      if (source !== "direct") trackEvent("invite_upload_success", { source });
       await onUploaded();
     } catch (err) {
       setStatus("error");
       const isParseError = err instanceof InstagramExportParseError;
-      trackEvent("upload_error", { reason: isParseError ? "parse_error" : "request_error" });
+      trackEvent(uploaded ? "result_error" : "upload_error", { source, reason: isParseError ? "parse_error" : "request_error" });
       setError(
         isParseError
           ? err.message
@@ -79,9 +84,15 @@ export function UploadFlow({ onUploaded }: UploadFlowProps) {
   function selectFile(selected: File | null) {
     setError(null);
     if (!selected) return;
+    const saved = readImportProgress();
+    const guideOpenedAt = saved?.path === window.location.pathname ? saved.guideOpenedAt : undefined;
+    const exportOpenedAt = saved?.path === window.location.pathname ? saved.exportOpenedAt : undefined;
+    trackEvent("file_selected", { source, valid_type: selected.name.toLowerCase().endsWith(".zip"),
+      ...(guideOpenedAt ? { seconds_since_guide: Math.max(0, Math.floor((Date.now() - guideOpenedAt) / 1000)) } : {}),
+      ...(exportOpenedAt ? { seconds_since_export_open: Math.max(0, Math.floor((Date.now() - exportOpenedAt) / 1000)) } : {}) });
     if (!selected.name.toLowerCase().endsWith(".zip")) {
       setFile(null);
-      setError("ZIP 파일만 업로드할 수 있어요.");
+      setError("인스타에서 받은 압축 파일(.zip)을 그대로 선택해주세요.");
       return;
     }
     setFile(selected);
@@ -104,9 +115,9 @@ export function UploadFlow({ onUploaded }: UploadFlowProps) {
         onDragLeave={() => setDragging(false)}
         onDrop={(event) => { event.preventDefault(); setDragging(false); selectFile(event.dataTransfer.files[0] ?? null); }}>
         <span className="feature-icon"><Icon name="upload" /></span>
-        <strong>{file ? file.name : <>여기에 ZIP 파일을 드래그하거나<br />눌러서 선택하세요</>}</strong>
-        <small>{file ? `${formatFileSize(file.size)} · 눌러서 파일 변경` : "ZIP 파일만 업로드할 수 있어요."}</small>
-        <input id="zipFile" type="file" accept=".zip" aria-label="Instagram 데이터 ZIP 파일 선택"
+        <strong>{file ? file.name : "파일 선택하기"}</strong>
+        <small>{file ? `${formatFileSize(file.size)} · 눌러서 파일 변경` : "또는 여기에 파일을 끌어다 놓으세요."}</small>
+        <input id="zipFile" type="file" accept=".zip" aria-label="인스타 데이터 파일 선택하기"
           onChange={(event) => selectFile(event.target.files?.[0] ?? null)} />
       </label>
       {file && <div className="mt-6">
@@ -118,7 +129,7 @@ export function UploadFlow({ onUploaded }: UploadFlowProps) {
       </div>}
       {error && <div role="alert" className="error-message"><p>{error}</p></div>}
       <PrivacyNote />
-      <button type="submit" className="primary-button" disabled={!file}>{file ? "내 계정이 맞아요 · 계속하기" : "파일을 먼저 선택해주세요"} <Icon name="arrow" /></button>
+      {file && <button type="submit" className="primary-button">내 계정이 맞아요 · 계속하기 <Icon name="arrow" /></button>}
     </form>
   );
 }

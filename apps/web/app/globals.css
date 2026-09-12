@@ -147,7 +147,7 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .guide-count { position:absolute; right:6px; color:#6d7378; font-size:15px; font-weight:700; }
 .guide-screen { display:flex; flex-direction:column; min-height:calc(100svh - 140px); }
 .guide-screen .subtitle { margin-top:18px; }
-.guide-screen .primary-button { margin-top:auto; }
+.guide-screen > .primary-button { margin-top:18px; }
 .settings-preview { position:relative; min-height:300px; margin:28px 0 26px; }
 .phone-frame { width:65%; max-width:250px; margin:0 auto; padding:22px 16px; border:7px solid #555a5d; border-bottom:0; border-radius:30px 30px 0 0; background:#fdfbf7; box-shadow:0 16px 24px #3f392814; text-align:left; }
 .phone-frame p { margin:0 0 18px; color:#2b2420; font-size:18px; font-weight:800; }
@@ -189,3 +189,16 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .unreachable-share { display:flex; justify-content:center; align-items:center; gap:12px; width:84%; margin:18px auto 0; min-height:49px; padding:12px; border:1px solid #ede9df; border-radius:99px; background:#faf8f2; color:#71777a; font-size:16px; font-weight:700; }
 .unreachable-share:disabled { opacity:.6; cursor:wait; }
 .unreachable-share:hover { background:#f1eee5; }
+
+.connection-example { margin: 24px 0; padding: 22px 14px; border: 1px solid #e4dfd4; border-radius: 20px; background: #fffdf7; }
+.example-path { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 20px 0; color: #18563a; }
+.example-path span { padding: 12px; border-radius: 30px; background: #e2eedb; font-weight: 700; }
+.connection-example > p:last-child, .inline-import-guide > p { margin-top: 12px; font-size: 13px; line-height: 1.8; color: #626a60; }
+.import-title { margin: 24px 0 12px; font-size: 24px; font-weight: 700; color: #18563a; }
+.import-onboarding .upload-form { margin-top: 24px; }
+.resume-note { margin-top: 16px; padding: 12px; border-radius: 12px; background: #e2eedb; font-size: 14px; }
+.file-location-hint { margin: 16px 0 0; padding: 12px; border-radius: 12px; background: #fff0e1; color: #765333; font-size: 13px; }
+.inline-import-guide { margin-top: 18px; padding: 20px 16px; border-radius: 20px; background: #fffdf7; text-align: left; }
+.inline-import-guide h3 { font-size: 18px; font-weight: 700; color: #18563a; }
+.inline-import-guide > .primary-button { margin: 18px 0 4px; }
+.inline-import-guide .guide-checklist { margin: 20px 0; }
