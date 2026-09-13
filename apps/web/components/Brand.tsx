@@ -2,10 +2,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { type ReactNode } from "react";
 
-export function Icon({ name, className = "" }: { name: "arrow" | "back" | "lock" | "instagram" | "share" | "upload" | "link"; className?: string }) {
-  const paths = { arrow: "M5 12h14m-6-6 6 6-6 6", back: "m14 5-7 7 7 7", lock: "M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5zM12 14v3", instagram: "M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm9 9a4 4 0 1 1-8 0 4 4 0 0 1 8 0M17 7h.01", share: "m8 11 8-5M8 13l8 5M8 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0m12-7a2 2 0 1 1-4 0 2 2 0 0 1 4 0m0 14a2 2 0 1 1-4 0 2 2 0 0 1 4 0", upload: "M12 16V3m-5 5 5-5 5 5M5 11H3v10h18V11h-2", link: "m10 14 4-4m-6 2-2 2a4 4 0 0 0 6 6l3-3a4 4 0 0 0 0-6m1 1 2-2a4 4 0 0 0-6-6L9 7a4 4 0 0 0 0 6" };
+export function Icon({ name, className = "" }: { name: "arrow" | "back" | "instagram" | "share" | "upload" | "link"; className?: string }) {
+  const paths = { arrow: "M5 12h14m-6-6 6 6-6 6", back: "m14 5-7 7 7 7", instagram: "M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm9 9a4 4 0 1 1-8 0 4 4 0 0 1 8 0M17 7h.01", share: "m8 11 8-5M8 13l8 5M8 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0m12-7a2 2 0 1 1-4 0 2 2 0 0 1 4 0m0 14a2 2 0 1 1-4 0 2 2 0 0 1 4 0", upload: "M12 16V3m-5 5 5-5 5 5M5 11H3v10h18V11h-2", link: "m10 14 4-4m-6 2-2 2a4 4 0 0 0 6 6l3-3a4 4 0 0 0 0-6m1 1 2-2a4 4 0 0 0-6-6L9 7a4 4 0 0 0 0 6" };
   return <svg className={className} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
 }
+/**
+ * 로고는 항상 `/`로 보낸다 — `/` 자체가 이미 로그인+표시 이름까지 마친
+ * 세션이면 서버에서 `/result`로 리다이렉트하므로(apps/web/app/page.tsx),
+ * 여기서 세션을 따로 확인할 필요가 없다.
+ */
 export function BrandHeader({ back = false, home = false }: { back?: boolean; home?: boolean }) {
   return <header className={`brand-header ${back ? "center-logo" : ""}`}>{back && <Link className="back-button" href="/" aria-label="처음으로 돌아가기"><Icon name="back" /></Link>}<Link href="/" aria-label="가이 알아? 홈"><Image className="brand-logo" src="/assets/gai-ara_logo.png" width={150} height={50} priority alt="가이 알아?" /></Link>{!back && home && <Link className="small-link" href="/">처음으로<Icon name="arrow" /></Link>}</header>;
 }
@@ -15,8 +20,6 @@ export function Character({ kind = "wave", className = "" }: { kind?: "wave" | "
 export function Steps({ active }: { active: number }) {
   return <ol className="steps">{["파일 업로드", "분석 중", "결과 확인"].map((label, i) => <li key={label} className={active === i ? "active" : ""} aria-current={active === i ? "step" : undefined}><span>{i + 1}</span>{label}</li>)}</ol>;
 }
-export function PrivacyNote() { return <div className="privacy-note"><Icon name="lock" /><div><strong>연결 계산에 필요한 정보만 사용해요.</strong><br /><Link className="text-link text-xs" href="/privacy">개인정보처리방침 보기</Link></div></div>; }
-
 /** pair 결과·소개 링크 결과처럼 "가운데 정렬 + 캐릭터 + 상태 텍스트" 화면에서 공용으로 쓴다. */
 export function Centered({
   children,
@@ -38,6 +41,7 @@ export function Centered({
 export function StatusMessage({ children }: { children: ReactNode }) {
   return <p className="pair-status-message">{children}</p>;
 }
+
 
 export function ConnectionSearchArt() {
   return <div className="connection-search-art" role="img" aria-label="돋보기를 든 귤이 사람들 사이의 연결을 찾는 모습">

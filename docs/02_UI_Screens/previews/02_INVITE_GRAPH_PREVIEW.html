@@ -1,0 +1,495 @@
+<title>가이 알아 스토리보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<style>
+  :root{
+    --cream:#FBF3E4;
+    --cream-deep:#F1E3CC;
+    --card-bg:#FFFDF8;
+    --ink:#4A3423;
+    --ink-soft:#8C7159;
+    --ink-faint:#B4A088;
+    --orange:#F2872E;
+    --orange-deep:#D96A1B;
+    --orange-soft:#FBE7CE;
+    --line:#D8BFA0;
+    --line-strong:#C89B6A;
+  }
+  *{box-sizing:border-box;}
+  body{
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Gowun Dodum','Noto Sans KR',sans-serif;
+    margin:0;
+  }
+  .wrap{max-width:1360px;margin:0 auto;padding:48px 32px 64px;}
+
+  /* header */
+  .top{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    gap:24px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line);
+    padding-bottom:24px;margin-bottom:20px;
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand svg{width:44px;height:44px;flex:none;}
+  .brand-text h1{
+    font-family:'Jua',sans-serif;font-weight:400;
+    font-size:30px;margin:0;color:var(--ink);
+  }
+  .brand-text p{margin:2px 0 0;color:var(--ink-soft);font-size:14px;}
+  .top-tag{
+    text-align:right;color:var(--ink-soft);font-size:14px;line-height:1.6;
+    font-family:'Jua',sans-serif;
+  }
+
+  /* revision note */
+  .revnote{
+    background:var(--card-bg);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:20px 24px;
+    margin-bottom:40px;
+    display:grid;
+    grid-template-columns:auto 1fr;
+    gap:6px 20px;
+  }
+  .revnote .rev-label{
+    font-family:'Jua',sans-serif;color:var(--orange-deep);
+    font-size:13px;letter-spacing:.03em;grid-column:1/-1;
+    text-transform:uppercase;margin-bottom:4px;
+  }
+  .revnote ol{
+    grid-column:1/-1;margin:0;padding-left:20px;
+    display:grid;gap:8px;font-size:14.5px;color:var(--ink);
+  }
+  .revnote b{color:var(--orange-deep);}
+
+  /* section label */
+  .section-label{
+    font-family:'Jua',sans-serif;font-size:14px;color:var(--ink-soft);
+    margin:0 0 18px;letter-spacing:.02em;
+  }
+
+  /* board grid */
+  .board{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(232px,1fr));
+    gap:26px;
+    margin-bottom:44px;
+  }
+  .cell{display:flex;flex-direction:column;}
+  .cell .eyebrow{
+    font-size:12.5px;color:var(--ink-soft);margin:0 0 3px 2px;
+    font-weight:700;
+  }
+  .cell .purpose{
+    font-size:12px;color:var(--ink-faint);margin:0 0 10px 2px;
+  }
+  .phone{
+    background:var(--card-bg);
+    border:1px solid rgba(74,52,35,.09);
+    border-radius:26px;
+    box-shadow:0 16px 28px -20px rgba(74,52,35,.45);
+    padding:20px 16px 22px;
+    min-height:352px;
+    display:flex;flex-direction:column;
+    flex:1;
+  }
+  .phone.warm{background:linear-gradient(180deg,#FFF6E9,#FFFDF8 55%);}
+  .phone.dark{
+    background:linear-gradient(180deg,#1C1710,#100D09 70%);
+    border-color:rgba(242,135,46,.18);
+    box-shadow:0 20px 34px -18px rgba(0,0,0,.6);
+  }
+  .phone.dark .headline{color:#FBF3E4;}
+  .phone.dark .sub{color:#D8BFA0;}
+  .phone.dark .cap{color:#8C7159;}
+  .phone.dark .node{background:rgba(242,135,46,.16);}
+  .phone.dark .seg{background:rgba(242,135,46,.4);}
+  .phone.dark .dot{background:var(--orange);}
+  .phone.dark .btn.text{color:#D8BFA0;}
+  .phone.dark .node img,.phone.dark .stage img{mix-blend-mode:normal;background:#FBF3E4;border-radius:50%;}
+
+  .stage{
+    height:96px;position:relative;
+    display:flex;align-items:center;justify-content:center;gap:14px;
+  }
+  .stage img{width:60px;height:60px;object-fit:contain;mix-blend-mode:multiply;}
+  .stage img.flip{transform:scaleX(-1);}
+  .screen08-stage{transform:scale(.875);margin:-6px 0;}
+  .qmark{
+    font-family:'Jua',sans-serif;color:var(--orange);font-size:20px;
+  }
+  .link-dash{
+    position:absolute;top:50%;left:26%;right:26%;
+    border-top:2px dashed var(--line-strong);
+  }
+  .link-solid{
+    position:absolute;top:50%;left:24%;right:24%;
+    border-top:2.5px solid var(--orange);
+  }
+
+  .headline{
+    font-family:'Jua',sans-serif;font-weight:400;
+    font-size:18.5px;line-height:1.35;
+    margin:14px 0 0;text-wrap:balance;
+  }
+  .sub{
+    font-size:13px;color:var(--ink-soft);line-height:1.55;
+    margin:8px 0 0;flex:1;
+  }
+  .btn-stack{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+  .btn{
+    border-radius:12px;padding:10px 14px;font-size:13.5px;text-align:center;
+    font-weight:700;border:1px solid transparent;
+  }
+  .btn.primary{background:var(--orange);color:#fff;}
+  .btn.ghost{background:var(--orange-soft);color:var(--orange-deep);}
+  .btn.line{background:transparent;border-color:var(--line-strong);color:var(--ink-soft);}
+  .btn.text{background:none;color:var(--ink-faint);font-weight:400;text-decoration:underline;text-underline-offset:3px;padding:2px 0 0;}
+  .warn{
+    font-size:11.5px;color:var(--orange-deep);background:var(--orange-soft);
+    border-radius:10px;padding:8px 10px;margin-top:10px;line-height:1.5;
+  }
+
+  /* distance diagram */
+  .diagram{
+    display:flex;align-items:center;justify-content:center;gap:8px;margin:14px 0 4px;
+  }
+  .node{
+    width:44px;height:44px;border-radius:50%;
+    background:var(--orange-soft);display:flex;align-items:center;justify-content:center;
+    font-size:11px;color:var(--orange-deep);font-weight:700;flex:none;overflow:hidden;
+  }
+  .node img{width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply;}
+  .dot{width:11px;height:11px;border-radius:50%;background:var(--line-strong);flex:none;}
+  .seg{width:20px;height:2px;background:var(--line-strong);flex:none;}
+  .diagram.dashed .seg{background:none;border-top:2px dashed var(--line-strong);height:0;}
+  .diagram.dashed .dot{opacity:.35;}
+  .cap{text-align:center;font-size:11px;color:var(--ink-faint);margin-top:2px;}
+
+  /* stats row (06) */
+  .stats{display:flex;justify-content:space-between;gap:6px;margin-top:16px;}
+  .stat{flex:1;text-align:center;background:var(--orange-soft);border-radius:12px;padding:9px 4px;}
+  .stat b{display:block;font-family:'Jua',sans-serif;color:var(--orange-deep);font-size:16px;}
+  .stat span{font-size:10.5px;color:var(--ink-soft);}
+  .cluster{position:relative;height:110px;}
+  .cluster .node{position:absolute;width:38px;height:38px;font-size:9px;}
+  .cluster .center{width:56px;height:56px;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;}
+  .cluster .n1{left:14%;top:8%;}
+  .cluster .n2{right:14%;top:8%;}
+  .cluster .n3{left:2%;top:60%;}
+  .cluster .n4{right:2%;top:60%;}
+  .cluster .n5{left:32%;top:82%;}
+  .cluster .n6{right:32%;top:82%;}
+  .cluster svg{position:absolute;inset:0;width:100%;height:100%;}
+
+  /* deferred note (12) */
+  .deferred{
+    border:1.5px dashed var(--line-strong);
+    border-radius:20px;
+    padding:26px 24px;
+    display:flex;gap:18px;align-items:flex-start;
+    background:repeating-linear-gradient(135deg,rgba(216,191,160,.14) 0 10px,transparent 10px 20px);
+    margin-bottom:44px;
+  }
+  .deferred .num{
+    font-family:'Jua',sans-serif;color:var(--ink-faint);font-size:26px;flex:none;
+  }
+  .deferred h3{font-family:'Jua',sans-serif;font-weight:400;margin:0 0 6px;font-size:16px;}
+  .deferred p{margin:0;font-size:13.5px;color:var(--ink-soft);line-height:1.6;max-width:60ch;}
+
+  /* footer */
+  .foot{
+    border-top:1px solid var(--line);
+    padding-top:28px;
+    display:grid;grid-template-columns:repeat(3,1fr);gap:24px;
+  }
+  .foot-item{display:flex;gap:12px;align-items:flex-start;}
+  .foot-item svg{width:26px;height:26px;flex:none;color:var(--orange-deep);margin-top:2px;}
+  .foot-item b{display:block;font-size:14px;margin-bottom:3px;}
+  .foot-item span{font-size:12.5px;color:var(--ink-soft);line-height:1.5;}
+
+  @media (max-width:720px){
+    .top{flex-direction:column;align-items:flex-start;}
+    .top-tag{text-align:left;}
+    .foot{grid-template-columns:1fr;}
+  }
+</style>
+
+<div class="wrap">
+
+  <div class="top">
+    <div class="brand">
+      <svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="26" r="18" fill="var(--orange)"/><path d="M24 8c2 3 2 6 0 8" stroke="#5B8A3A" stroke-width="3" stroke-linecap="round"/></svg>
+      <div class="brand-text">
+        <h1>가이 알아?</h1>
+        <p>사람과 사람을 연결하고, 세상이 얼마나 가까운지 발견하는 서비스</p>
+      </div>
+    </div>
+    <div class="top-tag">생각보다 가까운,<br>우리의 연결.</div>
+  </div>
+
+  <div class="revnote">
+    <div class="rev-label">TASK-003 갱신 — 로그인 · 표시 이름 · 재사용 링크</div>
+    <ol>
+      <li><b>02 화면(신규)</b> — 카카오 로그인과 표시 이름 입력을 추가했다. 동일한 사람이 여러 링크를 받아도 하나의 participant로 모이게 하기 위함이며, 화면 04의 "이 사람을 알고 있나요?"를 "{표시 이름}님을 알고 있나요?"로 바꿀 수 있게 됐다.</li>
+      <li><b>03 화면</b> — 재사용 가능한 링크로 바꾸고, 공유와 명시적 복사 행동을 분리했다. 인원 상한과 만료 기간은 두지 않는다.</li>
+      <li><b>04 화면</b> — 익명 "이 사람을 알고 있나요?"를 표시 이름이 들어간 "수연님을 알고 있나요?"로 바꿨다(예시 이름).</li>
+      <li><b>05 화면</b> — <code>connect.png</code>로 두 감귤이 직접 이어진 상태를 보여준다. 기본 행동은 "나도 아는 사람에게 보내기", 보조 행동은 "이어진 사람 보기 →"로 구분한다.</li>
+      <li><b>06·07 화면</b> — 07은 별도 페이지가 아니라 06의 미니 그래프를 유지한 채 펼쳐지는 상태다. 공유하기를 Primary로, URL 복사를 Secondary로 둔다.</li>
+    </ol>
+  </div>
+
+  <p class="section-label">화면 01 – 12 · TASK-003 반영 시안</p>
+
+  <div class="board">
+
+    <!-- 01 -->
+    <div class="cell">
+      <p class="eyebrow">01 · 첫 화면</p>
+      <p class="purpose">서비스의 의미를 한눈에</p>
+      <div class="phone">
+        <div class="stage">
+          <img src="../assets/gamgyul-curious.png" alt="">
+          <span class="qmark">?</span>
+          <img src="../assets/gamgyul-curious.png" alt="" class="flip">
+        </div>
+        <p class="headline">나는 누구와 건너건너<br>아는 사이일까?</p>
+        <p class="sub">아는 사람들과 이어지다 보면<br>생각지도 못한 사람과 닿을지도 몰라요.</p>
+        <div class="btn-stack">
+          <div class="btn primary">시작해보기</div>
+        </div>
+        <div class="warn" style="margin-top:28px;padding:12px;text-align:center;">
+          <b>세상은 생각보다 좁대요</b><br><br>
+          몇 사람만 거치면 세상 누구와도<br>이어질 수 있다는 이야기가 있어요.
+        </div>
+      </div>
+    </div>
+
+    <!-- 02 -->
+    <div class="cell">
+      <p class="eyebrow">02 · 로그인·표시 이름</p>
+      <p class="purpose">한 사람을 하나의 노드로 식별</p>
+      <div class="phone">
+        <div class="stage">
+          <img src="../assets/gamgyul-default.png" alt="">
+        </div>
+        <p class="headline" style="margin-top:8px;">먼저, 나를 알려주세요</p>
+        <p class="sub">내가 아는 사람들과 이어지려면<br>로그인이 필요해요.</p>
+        <div class="btn-stack">
+          <div class="btn" style="background:#fee500;color:#191919;">●&nbsp;&nbsp;카카오로 계속하기</div>
+        </div>
+        <p class="warn" style="color:var(--ink-soft);background:transparent;padding:0;">로그인은 나를 구분하기 위해서만 사용해요.</p>
+        <p class="headline" style="margin-top:18px;">어떤 이름으로<br>불릴까요?</p>
+        <p class="sub">아는 사람에게 보여줄 이름을 적어주세요.</p>
+        <div class="btn-stack">
+          <div class="btn line">이름 또는 닉네임</div>
+          <div class="btn primary">이 이름으로 시작하기</div>
+        </div>
+        <p class="warn" style="color:var(--ink-soft);background:transparent;padding:0;">실명이 아니어도 괜찮아요.</p>
+      </div>
+    </div>
+
+    <!-- 03 -->
+    <div class="cell">
+      <p class="eyebrow">03 · 지인 연결</p>
+      <p class="purpose">실제 관계 만들기 (재사용 링크)</p>
+      <div class="phone">
+        <div class="stage">
+          <img src="../assets/gamgyul-default.png" alt="">
+        </div>
+        <p class="headline">실제로 아는 사람에게<br>이 링크를 보내보세요.</p>
+        <p class="sub">서로 아는 사이라고 확인하면 바로 이어져요.</p>
+        <div class="btn-stack">
+          <div class="btn primary">공유하기</div>
+          <div class="btn line">gai-ara.../invite/xxxx　　　　복사</div>
+        </div>
+        <p class="warn"><b>실제로 아는 사람에게만 보내주세요.</b></p>
+        <p class="cap">이어진 사람 보기 →</p>
+      </div>
+    </div>
+
+    <!-- 04 -->
+    <div class="cell">
+      <p class="eyebrow">04 · 지인 확인</p>
+      <p class="purpose">가짜 연결 방지</p>
+      <div class="phone">
+        <div class="stage">
+          <img src="../assets/gamgyul-curious.png" alt="">
+          <span class="qmark">?</span>
+          <img src="../assets/gamgyul-curious.png" alt="" class="flip">
+        </div>
+        <p class="headline">수연님을<br>알고 있나요?</p>
+        <p class="sub">실제로 아는 사이라면 알려주세요.</p>
+        <div class="btn-stack">
+          <div class="btn primary">네, 알고 있어요</div>
+          <div class="btn text">잘 모르겠어요</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 05 -->
+    <div class="cell">
+      <p class="eyebrow">05 · 연결 완료</p>
+      <p class="purpose">첫 보상 + 전파</p>
+      <div class="phone warm">
+        <div class="stage">
+          <img src="../assets/connect.png" alt="" style="width:100%;max-width:240px;">
+        </div>
+        <p class="headline">수연님과<br>연결됐어요.</p>
+        <p class="sub">이제 서로 아는 사이로 이어졌어요.</p>
+        <div class="btn-stack">
+          <div class="btn primary">나도 아는 사람에게 보내기</div>
+          <div class="btn text">이어진 사람 보기 →</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 06 -->
+    <div class="cell">
+      <p class="eyebrow">06 · 내 연결 (메인)</p>
+      <p class="purpose">관계가 자라는 재미</p>
+      <div class="phone">
+        <div class="cluster">
+          <svg><g stroke="var(--line-strong)" stroke-width="1.5">
+            <line x1="50%" y1="50%" x2="18%" y2="14%"/>
+            <line x1="50%" y1="50%" x2="82%" y2="14%"/>
+            <line x1="50%" y1="50%" x2="10%" y2="66%"/>
+            <line x1="50%" y1="50%" x2="90%" y2="66%"/>
+            <line x1="50%" y1="50%" x2="36%" y2="86%"/>
+            <line x1="50%" y1="50%" x2="64%" y2="86%"/>
+          </g></svg>
+          <div class="node n1"><img src="../assets/gamgyul-default.png" alt=""></div>
+          <div class="node n2"></div>
+          <div class="node n3"></div>
+          <div class="node n4"><img src="../assets/gamgyul-default.png" alt=""></div>
+          <div class="node n5"></div>
+          <div class="node n6"></div>
+          <div class="node center"><img src="../assets/gamgyul-default.png" alt=""></div>
+        </div>
+        <p class="headline" style="font-size:24px;">여기서부터 이어져요</p>
+        <p class="sub" style="text-align:center;margin-top:6px;">아는 사람들이 하나둘 참여하면<br>건너건너 이어진 사이도 나타나요.</p>
+        <div class="btn-stack">
+          <div class="btn primary">아는 사람에게 보내기</div>
+          <p class="sub" style="margin-top:-8px;font-size:11px;">실제로 아는 사이를 확인해요.</p>
+          <div class="btn text">몇 다리인지 확인할 링크 공유하기 ↑</div>
+          <p class="sub" style="margin-top:-8px;font-size:11px;">나와 건너건너 얼마나 가까운지 확인해요.</p>
+          <div style="border-top:1px solid var(--line);margin-top:8px;padding-top:16px;">
+            <p class="headline" style="margin-top:0;font-size:17px;">몇 다리인지 확인해볼까요?</p>
+            <p class="sub">이 링크를 공유하면<br>나와 몇 다리 건너 아는 사이인지 확인할 수 있어요.</p>
+            <div class="btn primary" style="margin-top:14px;">공유하기</div>
+            <div class="btn line" style="margin-top:8px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">gai-ara.../r/xxxx <b style="float:right;color:var(--orange-deep);">복사</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 08 -->
+    <div class="cell">
+      <p class="eyebrow">08 · 공개 링크 진입</p>
+      <p class="purpose">모르는 사람도 참여</p>
+      <div class="phone">
+        <div class="stage screen08-stage">
+          <img src="../assets/gamgyul-curious.png" alt="">
+          <span class="qmark">?</span>
+          <img src="../assets/gamgyul-curious.png" alt="" class="flip">
+        </div>
+        <p class="headline">수연님과 나는<br>몇 다리 건너 아는 사이일까?</p>
+        <p class="sub">서로 모르는 사이여도 생각보다 가까울 수 있어요.</p>
+        <div class="btn-stack">
+          <div class="btn primary">몇 다리인지 확인하기</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 09 -->
+    <div class="cell">
+      <p class="eyebrow">09 · 연결 발견</p>
+      <p class="purpose">핵심 경험 (WOW)</p>
+      <div class="phone dark">
+        <p class="headline" style="margin-top:0;">생각보다<br>가까웠어요.</p>
+        <div class="diagram">
+          <div class="node"><img src="../assets/gamgyul-wave.png" alt=""></div>
+          <div class="seg"></div><div class="dot"></div><div class="seg"></div>
+          <div class="dot"></div><div class="seg"></div>
+          <div class="node"><img src="../assets/gamgyul-wave.png" alt="" class="flip"></div>
+        </div>
+        <p class="cap">나 · · · · 상대</p>
+        <p class="sub" style="text-align:center;">두 사람을 거치면 서로 닿아요.</p>
+        <div class="btn-stack">
+          <div class="btn primary">결과 공유하기</div>
+          <div class="btn text">나도 시작하기</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10 -->
+    <div class="cell">
+      <p class="eyebrow">10 · 연결 미발견</p>
+      <p class="purpose">실패가 아니라 새로운 시작</p>
+      <div class="phone">
+        <div class="diagram dashed">
+          <div class="node"><img src="../assets/gamgyul-search.png" alt=""></div>
+          <div class="seg"></div><div class="dot"></div><div class="seg"></div>
+          <div class="node"><img src="../assets/gamgyul-search.png" alt="" class="flip"></div>
+        </div>
+        <p class="headline" style="text-align:center;">아직 이어지지 않았어요.</p>
+        <p class="sub">지금까지의 연결에서는 서로를 잇는 경로를 찾지 못했어요. 내 주변의 연결이 늘어나면 결과가 달라질 수 있어요.</p>
+        <div class="btn-stack">
+          <div class="btn primary">나도 시작하기</div>
+          <div class="btn line">다시 확인하기</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 11 -->
+    <div class="cell">
+      <p class="eyebrow">11 · 공유 카드</p>
+      <p class="purpose">외부 바이럴 (예시)</p>
+      <div class="phone warm" style="border:1px solid var(--orange-soft);">
+        <p class="headline" style="margin-top:0;">생각보다<br>가까운 사이예요.</p>
+        <div class="diagram">
+          <div class="node"><img src="../assets/gamgyul-heart.png" alt=""></div>
+          <div class="seg"></div><div class="dot"></div><div class="seg"></div>
+          <div class="dot"></div><div class="seg"></div>
+          <div class="node"><img src="../assets/gamgyul-heart.png" alt="" class="flip"></div>
+        </div>
+        <p class="sub" style="text-align:center;">두 사람을 거치면 서로 닿아요.</p>
+        <p class="cap" style="margin-top:14px;font-family:'Jua',sans-serif;font-size:13px;color:var(--orange-deep);">가이 알아?</p>
+      </div>
+    </div>
+
+    <!-- 12 -->
+    <div class="cell">
+      <p class="eyebrow">12 · (별도) 연결된 세상</p>
+      <p class="purpose">일정 규모 이상에서만 제공</p>
+      <div class="phone dark" style="align-items:center;text-align:center;justify-content:center;gap:10px;">
+        <div style="font-size:26px;">🔒</div>
+        <p class="headline" style="text-align:center;">지금은 준비 중이에요.</p>
+        <p class="sub" style="text-align:center;">더 많은 사람들이 모이면<br>연결된 세상을 보여드릴게요.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="section-label" style="margin-top:-24px;">12번은 참여자가 일정 규모 이상이 되면 잠금이 풀리고 실제 전체 그래프(Obsidian식 뷰)가 열린다 — 기준선은 구현 단계에서 정한다.</p>
+
+  <div class="foot">
+    <div class="foot-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 21V10M12 10c0-4 3-7 7-7 0 4-3 7-7 7Zm0 0C12 6 9 3 5 3c0 4 3 7 7 7Z"/></svg>
+      <div><b>사람이 모일수록, 지도가 자라요.</b><span>당신의 연결이 누군가에게는 새로운 발견이 됩니다.</span></div>
+    </div>
+    <div class="foot-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-9.5-9A5 5 0 0 1 12 6a5 5 0 0 1 9.5 5c-2.5 4.6-9.5 9-9.5 9Z"/></svg>
+      <div><b>생각보다 가까운, 우리의 연결.</b><span>가이 알아?</span></div>
+    </div>
+    <div class="foot-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 4 6 4 9s-1.5 6.4-4 9c-2.5-2.6-4-6-4-9s1.5-6.4 4-9Z"/></svg>
+      <div><b>작은 연결이 만드는, 더 가까운 세상.</b><span>지금, 함께 만들어가요.</span></div>
+    </div>
+  </div>
+
+</div>

@@ -13,26 +13,61 @@ import {
  * (packages/db는 이 해시를 어떻게 만드는지 모른다 — 해싱은 apps/web의
  * 서버 전용 코드에서만 IDENTITY_PEPPER를 사용해 수행한다.)
  *
- * "고스트" 노드는 없다 — 이 테이블은 실제로 자기 데이터를 업로드한
- * 사람만 담는다(participant-only 그래프). 누군가의 following 목록에만
- * 등장하고 아직 업로드하지 않은 사람은 `follows.followee_identity_hash`에
- * 해시만 남고, 이 테이블에는 그 사람이 직접 업로드하기 전까지 행이
- * 생기지 않는다.
+ * Instagram 없이 지인 확인 링크(pair_invites)만으로 참여하는 사람은 매칭에
+ * 쓸 username이 없으므로, identityHash 자리에 무작위 불투명 값(예:
+ * `bootstrap:<random hex>`)을 대신 채운다 — 이 값은 어떤 실제 계정과도
+ * 매칭되지 않는 순수 opaque id로만 쓰인다(apps/web의 참여자 생성 로직 참고).
+ *
+ * "고스트" 노드는 없다 — 이 테이블은 실제로 자기 데이터를 업로드했거나
+ * 최소 부트스트랩으로 참여를 확정한 사람만 담는다(participant-only 그래프).
+ * 누군가의 following 목록에만 등장하고 아직 업로드하지 않은 사람은
+ * `follows.followee_identity_hash`에 해시만 남고, 이 테이블에는 그 사람이
+ * 직접 참여하기 전까지 행이 생기지 않는다.
  *
  * recoveryToken: 세션 쿠키가 지워지거나(시크릿 모드, 다른 기기, 쿠키 삭제)
  * DB가 초기화돼도 "내 결과"로 돌아올 수 있게 하는 개인용 복구 링크 값.
  * 참가자 최초 생성 시 한 번 발급되고 재업로드해도 그대로 유지된다 —
  * referralLinks.token과 달리 이건 아무에게도 공유되지 않고 본인만 안다는
  * 전제로 세션 대신 쓸 수 있다(§ /result/[token]).
+ *
+ * displayName: TASK-003(v2)부터 추가. 로그인 프로필(카카오 닉네임 등)에서
+ * 자동으로 채우지 않고, 사용자가 화면 02에서 직접 입력한 값만 담는다(과거
+ * 행/Instagram 참여자는 NULL). 직접 연결된 상대의 화면, 본인 화면, 본인이
+ * 만든 공개 링크 결과에서만 노출한다 — 검색·임의 조회에는 쓰지 않는다
+ * (`AGENTS.md` §1 원칙 3).
  */
 export const participants = pgTable("participants", {
   id: uuid("id").defaultRandom().primaryKey(),
   identityHash: text("identity_hash").notNull(),
   recoveryToken: text("recovery_token").notNull(),
+  displayName: text("display_name"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   identityHashUnique: uniqueIndex("participants_identity_hash_key").on(table.identityHash),
   recoveryTokenUnique: uniqueIndex("participants_recovery_token_key").on(table.recoveryToken),
+}));
+
+/**
+ * TASK-003(v2) — 카카오 로그인으로 동일 사용자를 판별하는 조인 테이블.
+ * `(provider, providerAccountId)`가 실제 동일인 판정의 근거다 —
+ * `participants.identityHash`는 카카오 참여자에게는 `kakao:<random hex>`
+ * 자리채움 값일 뿐 매칭에 쓰이지 않는다(apps/web/lib/participants.ts의
+ * `findOrCreateKakaoParticipant` 참고). provider는 지금은 'kakao' 고정값
+ * 하나뿐이다(결정 로그 2026-09-13 항목 7 — 다른 제공자는 추가하지 않음).
+ */
+export const oauthAccounts = pgTable("oauth_accounts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  participantId: uuid("participant_id")
+    .notNull()
+    .references(() => participants.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(),
+  providerAccountId: text("provider_account_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  providerAccountUnique: uniqueIndex("oauth_accounts_provider_account_key").on(
+    table.provider,
+    table.providerAccountId,
+  ),
 }));
 
 /** 로그인 없이 "내 결과 다시 보기"를 지원하기 위한 최소한의 세션. */
@@ -72,6 +107,12 @@ export type PairInviteStatus = (typeof pairInviteStatus)[number];
 
 /**
  * "우리 몇다리?" 공유 링크. token은 추측 불가능한 무작위 값이어야 한다.
+ *
+ * 2026-09-13 결정 이후: `status = 'accepted'`인 행(inviter, recipient 쌍)
+ * 자체가 그래프의 edge 소스다 — 별도 edge 테이블을 두지 않는다. recipient가
+ * "실제로 아는 사이인가요?"에 "네"라고 확인해 이 행이 accepted로 바뀌는
+ * 순간이 곧 edge 생성 이벤트다(apps/web/lib/participants.ts의 `getAllEdges`
+ * 참고). inviter 쪽 재확인은 요구하지 않는다.
  *
  * label: inviter가 "이거 누구한테 보낸 거였지" 기억하려고 붙이는 선택적
  * 메모다. inviter 자신에게만 보인다 — recipient나 다른 누구에게도 절대
@@ -164,4 +205,62 @@ export const pairResults = pgTable("pair_results", {
   computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   pairInviteUnique: uniqueIndex("pair_results_pair_invite_key").on(table.pairInviteId),
+}));
+
+/**
+ * TASK-003(v2) — 재사용 가능한 "지인 링크". `pairInvites`(1회용, 링크당
+ * 정확히 1명만 accept 가능)와 달리 한 사람이 실제 지인 여러 명에게 같은
+ * 링크를 반복해서 보낼 수 있다. 재사용을 허용하면서 사라진 1회용 토큰의
+ * `maxUses`와 `expiresAt`은 초기 제한 설계에서 만들어진 레거시 컬럼이다. 현재 링크
+ * 유효성 판정에는 사용하지 않으며, 파괴적 마이그레이션 전까지 호환 목적으로 남긴다.
+ *
+ * 한 participant는 유효한(만료·폐기되지 않은) 링크를 동시에 하나만
+ * 가진다 — 새 링크를 만들면(`POST /api/links`) 기존 링크를 `revokedAt =
+ * now()`로 폐기하고 새로 만든다(참여자별 링크 재발급, 여러 개 동시 발급
+ * 없음). 관계 해제 기능이 없는 것과 별개로, 링크 자체의 폐기/재발급은
+ * 소유자가 언제든 할 수 있다.
+ */
+export const acquaintanceLinks = pgTable("acquaintance_links", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  token: text("token").notNull(),
+  ownerParticipantId: uuid("owner_participant_id")
+    .notNull()
+    .references(() => participants.id, { onDelete: "cascade" }),
+  maxUses: integer("max_uses").notNull().default(50),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tokenUnique: uniqueIndex("acquaintance_links_token_key").on(table.token),
+}));
+
+/**
+ * TASK-003(v2) — 지인 링크 수신자가 "실제로 아는 사이"라고 확인한 기록.
+ * 2026-09-13 결정 이후 이 테이블의 모든 행이 그래프의 edge 소스다(§
+ * apps/web/lib/participants.ts의 `getAllEdges` 참고) — `link.ownerParticipantId`와
+ * `confirmerParticipantId`의 조합이 곧 edge다. `pairInvites` 기반 1회용
+ * edge 소스는 이 테이블로 교체됐다(코드는 삭제하지 않고 `follows`와 같은
+ * 취급으로 보존).
+ *
+ * 한 사람은 같은 링크를 두 번 확인할 수 없다(UNIQUE) — 두 번째 확인
+ * 요청은 에러 없이 기존 행 그대로 성공 처리한다(멱등). soft-delete
+ * 컬럼을 의도적으로 두지 않는다 — 확인된 관계를 되돌리는 기능은 제품
+ * 결정으로 제공하지 않는다(친밀도가 아니라 "실제로 아는 사이였다"는
+ * 사실 자체를 기록하는 것이 이 그래프의 목적이므로, 관계가 나빠졌다는
+ * 이유로 edge를 지우면 그 목적을 왜곡한다).
+ */
+export const acquaintanceConfirmations = pgTable("acquaintance_confirmations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  linkId: uuid("link_id")
+    .notNull()
+    .references(() => acquaintanceLinks.id, { onDelete: "cascade" }),
+  confirmerParticipantId: uuid("confirmer_participant_id")
+    .notNull()
+    .references(() => participants.id, { onDelete: "cascade" }),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  linkConfirmerUnique: uniqueIndex("acquaintance_confirmations_link_confirmer_key").on(
+    table.linkId,
+    table.confirmerParticipantId,
+  ),
 }));

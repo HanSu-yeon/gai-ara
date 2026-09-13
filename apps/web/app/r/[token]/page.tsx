@@ -3,8 +3,8 @@ import { ReferralLanding } from "@/components/ReferralLanding";
 
 const SHARE_IMAGE = { url: "/assets/gamgyul-wave.png", width: 1234, height: 1274, alt: "인사하는 감귤 캐릭터" };
 
-const title = "몇 명의 지인을 거치면 닿을까요? · 가이 알아?";
-const description = "우리, 몇 다리 건너 아는 사이일까? 지금 확인해봐요.";
+const title = "생각보다 가까웠어요 · 가이 알아?";
+const description = "서로 모르는 사이여도 건너건너 연결돼 있을 수 있어요. 지금 확인해봐요.";
 
 export const metadata: Metadata = {
   title,

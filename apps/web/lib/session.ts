@@ -42,3 +42,14 @@ export async function createSession(participantId: string): Promise<void> {
     expires: expiresAt,
   });
 }
+
+/** 현재 세션 쿠키를 지우고, DB의 세션 행도 함께 삭제한다(로그아웃). */
+export async function destroySession(): Promise<void> {
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (token) {
+    const db = getDb();
+    await db.delete(sessions).where(eq(sessions.token, token));
+  }
+  jar.delete(SESSION_COOKIE);
+}

@@ -1,28 +1,59 @@
 import Link from "next/link";
-import { ImportReturnGate, ResumeImport } from "@/components/ImportOnboarding";
-import { BrandHeader, Character, Icon } from "@/components/Brand";
+import { redirect } from "next/navigation";
+import { BrandHeader, Character } from "@/components/Brand";
+import { isBackendConfigured } from "@/lib/env";
+import { getDisplayName } from "@/lib/participants";
+import { getSessionParticipantId } from "@/lib/session";
 
-export default function LandingPage() {
-  return <ImportReturnGate><main className="brand-page landing-page">
-    <BrandHeader />
-    <ResumeImport />
-    <section className="landing-hero">
-      <h1>제주,<br /><em>몇 다리</em> 건너면<br />다 아는 사이일까?</h1>
-      <p className="subtitle">생각보다, 우리는 가까이 연결되어 있어요.</p>
-      <div className="network-art" aria-label="귤 캐릭터를 중심으로 이어진 사람들의 연결">
-        <svg viewBox="0 0 400 210" className="network-lines" aria-hidden="true"><path d="M35 90Q120 80 180 145T360 150" stroke="#ffad78" /><path d="M20 180 60 145 35 90 95 25Q150 30 180 145M270 165Q325 155 320 85L385 55" stroke="#b9d6be" strokeDasharray="4 5" /></svg>
-        {[ [5,80], [12,38], [25,5], [24,68], [69,70], [86,63], [92,23] ].map(([x,y], i) => <span key={i} className={`person person-${i}`} style={{left:`${x}%`,top:`${y}%`}}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21v-4a8 8 0 0 1 16 0v4z"/></svg></span>)}
-        <Character /><span className="speech">우리<br />생각보다<br />가깝네?</span>
-      </div>
-      <Link className="primary-button" href="/upload">내 연결 확인하기 <Icon name="arrow" /></Link>
-    </section>
-    <section className="features" aria-label="서비스 특징">
-      <div><span className="feature-icon"><Icon name="instagram" /></span><p>내 인스타 데이터로<strong>간단하게</strong></p></div>
-      <div><span className="feature-icon peach"><Icon name="share" /></span><p>참여할수록 커지는<strong>네트워크</strong></p></div>
-      <div><span className="feature-icon"><Icon name="link" /></span><p>링크 하나로<strong>우리 사이 확인</strong></p></div>
-    </section>
-    <section id="about" className="about-card"><Character kind="search" /><div><span className="handwritten">가이 알아?</span><p>친구의 친구를 따라가다 보면<br />생각보다 가까운 사이일지도 몰라요.</p></div></section>
-    <Link href="/upload/guide" className="guide-button">데이터 받는 법 보기 <Icon name="arrow" /></Link>
-    <Link href="/privacy" className="footer-link">개인정보처리방침</Link>
-  </main></ImportReturnGate>;
+/**
+ * 화면 01(첫 화면). 이미 로그인+표시 이름까지 마친 세션이면 이 랜딩을
+ * 보여주지 않고 서버 사이드에서 `/result`로 바로 보낸다 — `BrandHeader`가
+ * 클라이언트에서 로고 링크만 바꾸는 것과 달리, 여기서는 페이지 자체를
+ * 깜빡임 없이 리다이렉트해야 하므로 서버 컴포넌트에서 세션을 먼저 확인한다.
+ */
+export default async function LandingPage() {
+  if (isBackendConfigured()) {
+    const participantId = await getSessionParticipantId();
+    if (participantId) {
+      const displayName = await getDisplayName(participantId);
+      if (displayName) redirect("/result");
+    }
+  }
+
+  return (
+    <main className="brand-page landing-page">
+      <BrandHeader />
+      <section className="landing-hero">
+        <div className="duo-art" role="img" aria-label="마주보는 감귤 캐릭터 두 마리와 물음표">
+          <Character kind="curious" />
+          <span className="duo-qmark">?</span>
+          <Character kind="curious" className="duo-character-flip" />
+        </div>
+        <h1>
+          나는 누구와 건너건너
+          <br />
+          아는 사이일까?
+        </h1>
+        <p className="subtitle">
+          아는 사람들과 이어지다 보면
+          <br />
+          생각지도 못한 사람과 닿을지도 몰라요.
+        </p>
+        <Link className="primary-button" href="/login">
+          시작해보기
+        </Link>
+        <section className="landing-basis" aria-labelledby="landing-basis-title">
+          <h2 id="landing-basis-title">세상은 생각보다 좁대요</h2>
+          <p>
+            몇 사람만 거치면 세상 누구와도
+            <br />
+            이어질 수 있다는 이야기가 있어요.
+          </p>
+        </section>
+      </section>
+      <Link href="/privacy" className="footer-link">
+        개인정보처리방침
+      </Link>
+    </main>
+  );
 }

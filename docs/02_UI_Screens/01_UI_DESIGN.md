@@ -7,6 +7,11 @@
 사용자의 이번 제안이 카피와 흐름의 기준이다. Consumer UX는 읽기와 기억 부담 감소,
 Functionality는 기존 파일 처리와 복귀 상태 보존을 기준으로 검토한다.
 
+> 2026-09-13: 이 Instagram 파일 가져오기 흐름은 MVP 기본 경로에서 제외됐다(제품 결정
+> [00_PRODUCT_DECISION_LOG.md](../01_Concept_Design/00_PRODUCT_DECISION_LOG.md) 2026-09-13
+> 항목, 새 화면 스토리보드는 [02_INVITE_GRAPH_CONCEPT.md](./02_INVITE_GRAPH_CONCEPT.md)
+> 참고). 후순위 기능으로 재검토할 때까지 이 문서는 참고용으로 남긴다.
+
 ## 화면 구성
 모바일 단일 열을 데스크톱에서도 중앙 정렬한다. 기존 브랜드 색·버튼·캐릭터를 재사용한다.
 초대는 제목, 이름 없는 연결 예시, 연결 확인하기, 파일이 필요하다는 짧은 설명 순서다.

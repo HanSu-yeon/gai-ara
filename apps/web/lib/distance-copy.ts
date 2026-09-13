@@ -25,12 +25,36 @@ export function formatConnectionPhrase(distance: number): string {
 }
 
 /**
- * "나 ─ ● ─ ● ─ 상대" 형태의 시각 설명. 점(●) 개수는 중간 지인 수
- * (intermediaries = distance - 1)와 같다 — 직접 연결(distance 1)이면 점 없이
- * "나 ─ 상대"만 보여준다.
+ * 화면 08~11(공개 링크) 전용 문구. `formatConnectionPhrase`와 같은
+ * `distance - 1` 규칙을 쓰지만, "다리/단계" 대신 "사람을 거치면"으로
+ * 옮기는 카피 원칙(`02_INVITE_GRAPH_CONCEPT.md` 카피 원칙)을 따른다 —
+ * 점 개수(intermediaries)와 이 문구의 숫자가 항상 같아야 한다.
  */
-export function formatConnectionDiagram(distance: number): string {
+export function formatIntermediaryPhrase(distance: number): string {
   const intermediaries = Math.max(distance - 1, 0);
-  const dots = "● ─ ".repeat(intermediaries);
-  return `나 ─ ${dots}상대`;
+  if (intermediaries === 0) return "바로 연결되어 있어요.";
+
+  const numeral = KOREAN_NUMERALS[intermediaries] ?? `${intermediaries}`;
+  return `${numeral} 사람을 거치면 서로 닿아요.`;
+}
+
+/**
+ * 화면 09(연결 발견) 헤드라인 — 최대 거리를 가정하지 않는다. `distance`는
+ * 실제 shortest-path 결과 그대로 받아 그때그때 문구를 만든다(2026-09-14
+ * 결정: "최대 몇 다리까지"가 아니라 "실제로 몇 다리 건너"를 보여준다).
+ */
+export function formatConnectionHeadline(distance: number): { top: string; bottom: string } {
+  if (distance <= 1) return { top: "이미 바로", bottom: "아는 사이네요" };
+
+  const intermediaries = distance - 1;
+  const numeral = KOREAN_NUMERALS[intermediaries] ?? `${intermediaries}`;
+  return { top: `${numeral} 다리 건너`, bottom: "아는 사이" };
+}
+
+/** 화면 09 헤드라인 바로 아래 보조 문구. */
+export function formatConnectionSubtitle(distance: number): string {
+  if (distance <= 1) return "다른 사람을 거치지 않고 바로 아는 사이예요.";
+
+  const intermediaries = distance - 1;
+  return `둘 사이에 ${intermediaries}명의 지인이 이어져 있어요.`;
 }

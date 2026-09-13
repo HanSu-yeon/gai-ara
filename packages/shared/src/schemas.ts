@@ -1,24 +1,19 @@
 import { z } from "zod";
 
 /**
- * 클라이언트가 ZIP을 파싱해서 얻은 "내가 팔로우하는 사람" 목록을 서버로
- * 올릴 때 쓰는 payload. followers 원본은 아예 전송하지 않는다 — mutual
- * 여부는 클라이언트가 판단하지 않고, 서버가 두 참여자의 following을
- * 대조해서 판정한다([01_DB_SCHEMA.md §4](../../../docs/03_Technical_Specs/01_DB_SCHEMA.md) 참고).
+ * 화면 06 미니 그래프 노드 하나. root(나) 자신은 포함하지 않는다.
+ * `parentId`가 null이면 root에 직접 연결된 노드(depth 1)다. `displayName`은
+ * 이 노드가 트리의 leaf(더 뻗어나가지 않는 끝)이고 표시 이름을 설정한
+ * 참여자일 때만 채워진다 — 중간에 낀 연결자는 leaf가 아니므로 항상
+ * `displayName: null`로 내려간다(v2 명세, 2026-09-14 결정).
  */
-export const uploadFollowingSchema = z.object({
-  selfUsername: z.string().min(1).max(60),
-  followingUsernames: z.array(z.string().min(1).max(60)).max(20_000),
+export const egoNetworkNodeSchema = z.object({
+  id: z.string(),
+  parentId: z.string().nullable(),
+  depth: z.number().int().min(1).max(3),
+  displayName: z.string().nullable(),
 });
-export type UploadFollowingInput = z.infer<typeof uploadFollowingSchema>;
-
-export const createInviteSchema = z.object({
-  /** inviter 자신만 보는 메모 — recipient에게는 절대 노출되지 않는다. */
-  label: z.string().max(40).optional(),
-  /** recipient에게 그대로 보여줄 공개용 이름("OO님이 궁금해해요"). */
-  nickname: z.string().max(20).optional(),
-});
-export type CreateInviteInput = z.infer<typeof createInviteSchema>;
+export type EgoNetworkNode = z.infer<typeof egoNetworkNodeSchema>;
 
 export const meResultSchema = z.object({
   distanceCounts: z.object({
@@ -26,48 +21,24 @@ export const meResultSchema = z.object({
     within2: z.number().int().nonnegative(),
     within3: z.number().int().nonnegative(),
   }),
+  /** 화면 06 미니 그래프에 그릴 익명 대표 경로의 BFS 거리(최대 6개). */
+  representativeDistances: z.array(z.number().int().min(1).max(3)).max(6),
+  /** 화면 06 미니 그래프가 실제로 쓰는, 나를 root로 한 2~3홉 이내 트리. */
+  network: z.array(egoNetworkNodeSchema),
   /** 세션이 사라져도 "내 결과"로 돌아올 수 있는 개인용 복구 토큰. */
   recoveryToken: z.string(),
 });
 export type MeResult = z.infer<typeof meResultSchema>;
 
+/**
+ * 두 참여자 사이의 거리 계산 결과 — `computePairResult`(graph-service)의
+ * 반환 타입. `/api/r/{token}/result`(화면 08~10)가 이 함수를 그대로 쓴다.
+ */
 export const pairResultSchema = z.object({
   status: z.enum(["pending", "connected", "unreachable"]),
   distance: z.number().int().nonnegative().nullable(),
 });
 export type PairResult = z.infer<typeof pairResultSchema>;
-
-/**
- * `GET /api/invites/{token}` 응답. inviterNickname은 inviter가 직접 공개로
- * 적은 이름이라 recipient에게 보여줘도 된다 — inviter의 신원(해시, id 등)
- * 자체는 여기에도 절대 포함하지 않는다.
- */
-export const inviteStatusSchema = z.object({
-  status: z.enum(["pending", "accepted", "expired", "not-found"]),
-  inviterNickname: z.string().nullable().optional(),
-});
-export type InviteStatusResponse = z.infer<typeof inviteStatusSchema>;
-
-/**
- * "내 연결 목록" 한 줄. label은 inviter 자신이 남긴 메모라 inviter 쪽
- * 행에서만 채워진다(recipient 쪽 행은 항상 null) — 상대방 신원은 절대
- * 포함하지 않는다. inviterNickname은 공개용이라 양쪽 다 받는다.
- */
-export const myPairSummarySchema = z.object({
-  token: z.string(),
-  role: z.enum(["inviter", "recipient"]),
-  label: z.string().nullable(),
-  inviterNickname: z.string().nullable(),
-  status: z.enum(["pending", "accepted", "expired"]),
-  distance: z.number().int().nonnegative().nullable(),
-  createdAt: z.string(),
-});
-export type MyPairSummary = z.infer<typeof myPairSummarySchema>;
-
-export const myPairsResponseSchema = z.object({
-  pairs: z.array(myPairSummarySchema),
-});
-export type MyPairsResponse = z.infer<typeof myPairsResponseSchema>;
 
 /** owner가 자기 링크로 들어온 방문자 한 명과의 결과를 다시 볼 때. */
 export const referralVisitSchema = z.object({
@@ -109,3 +80,58 @@ export const referralResultSchema = z.object({
   distance: z.number().int().nonnegative().nullable(),
 });
 export type ReferralResult = z.infer<typeof referralResultSchema>;
+
+/**
+ * `GET /api/r/{token}` 응답 — TASK-003(v2)부터 소유자 표시 이름을 포함한다
+ * (v2 명세 §3.3). 여전히 소유자의 신원(해시, participant id)은 포함하지
+ * 않는다.
+ */
+export const referralLinkPublicInfoSchema = z.object({
+  ownerDisplayName: z.string().nullable(),
+});
+export type ReferralLinkPublicInfo = z.infer<typeof referralLinkPublicInfoSchema>;
+
+/** `PATCH /api/me/display-name` 요청 — 공백/빈 문자열을 거부한다. */
+export const updateDisplayNameSchema = z.object({
+  displayName: z.string().trim().min(1).max(30),
+});
+export type UpdateDisplayNameInput = z.infer<typeof updateDisplayNameSchema>;
+
+/**
+ * `POST /api/links` 응답 — 재사용 가능한 지인 링크. 소유자 신원은 포함하지
+ * 않는다(v2 명세 §3.2).
+ */
+export const acquaintanceLinkSchema = z.object({
+  token: z.string(),
+});
+export type AcquaintanceLink = z.infer<typeof acquaintanceLinkSchema>;
+
+/**
+ * `GET /api/links/{token}` 응답(화면 04) — 소유자의 participant id·해시는
+ * 포함하지 않는다. `ownerDisplayName`은 링크가 존재할 때만(not-found가
+ * 아닐 때만) 채워진다.
+ */
+export const acquaintanceLinkStatusSchema = z.object({
+  status: z.enum(["valid", "revoked", "not-found"]),
+  ownerDisplayName: z.string().nullable(),
+});
+export type AcquaintanceLinkStatusResponse = z.infer<typeof acquaintanceLinkStatusSchema>;
+
+/** `GET /api/me/connections` 한 줄 — 삭제 기능이 없으므로 제거용 id가 없다. */
+export const connectionSummarySchema = z.object({
+  displayName: z.string(),
+  confirmedAt: z.string(),
+});
+export type ConnectionSummary = z.infer<typeof connectionSummarySchema>;
+
+export const connectionsResponseSchema = z.object({
+  connections: z.array(connectionSummarySchema),
+});
+export type ConnectionsResponse = z.infer<typeof connectionsResponseSchema>;
+
+/** `GET /api/session` 응답 — 참여자 신원은 절대 포함하지 않는다. */
+export const sessionInfoSchema = z.object({
+  active: z.boolean(),
+  hasDisplayName: z.boolean(),
+});
+export type SessionInfo = z.infer<typeof sessionInfoSchema>;

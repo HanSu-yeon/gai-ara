@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { desc, eq, sql } from "drizzle-orm";
-import { getDb, referralLinks, referralVisits } from "@gai-ara/db";
+import { getDb, participants, referralLinks, referralVisits } from "@gai-ara/db";
 
 export interface ReferralLinkRecord {
   token: string;
@@ -42,6 +42,25 @@ export async function referralLinkExists(token: string): Promise<boolean> {
     .limit(1);
 
   return row !== undefined;
+}
+
+/**
+ * TASK-003(v2) — 링크가 존재하면 소유자의 표시 이름과 함께 돌려준다.
+ * 존재하지 않으면 null. 소유자의 participant id·해시는 절대 포함하지
+ * 않는다(v2 명세 §3.3).
+ */
+export async function getReferralLinkPublicInfo(
+  token: string,
+): Promise<{ ownerDisplayName: string | null } | null> {
+  const db = getDb();
+  const [row] = await db
+    .select({ ownerDisplayName: participants.displayName })
+    .from(referralLinks)
+    .innerJoin(participants, eq(participants.id, referralLinks.ownerParticipantId))
+    .where(eq(referralLinks.token, token))
+    .limit(1);
+
+  return row ?? null;
 }
 
 /**

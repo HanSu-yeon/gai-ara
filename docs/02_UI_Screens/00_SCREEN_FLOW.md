@@ -6,6 +6,11 @@
 사용자가 제안한 최소 UX를 반영한 검토 초안. 실제 앱 구현 전 HTML 확인 대기.
 [클릭 가능한 미리보기](./previews/01_IMPORT_PREVIEW.html).
 
+> 2026-09-13: 이 Instagram 파일 가져오기 흐름은 MVP 기본 경로에서 제외됐다(제품 결정
+> [00_PRODUCT_DECISION_LOG.md](../01_Concept_Design/00_PRODUCT_DECISION_LOG.md) 2026-09-13
+> 항목, 새 화면 스토리보드는 [02_INVITE_GRAPH_CONCEPT.md](./02_INVITE_GRAPH_CONCEPT.md)
+> 참고). 후순위 기능으로 재검토할 때까지 이 문서는 참고용으로 남긴다.
+
 ## 사용자 흐름
 - 일반 방문: 연결에 대한 기대 → 인스타 파일 받기 → 준비 순서와 선택값 → Instagram → 파일 선택.
 - 초대 방문: 링크를 만든 사람과의 연결 기대 → 연결 확인하기 → 동일 안내. 연결 그림에는 예시임을 명시한다.

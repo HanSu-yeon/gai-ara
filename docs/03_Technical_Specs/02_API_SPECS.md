@@ -6,6 +6,15 @@
 서버가 실제로 받는 데이터의 계약, (2) "우리 몇다리?" 초대 링크와 consent 플로우의
 엔드포인트 명세.
 
+> 2026-09-13: §3의 1회용 `pair_invites` 토큰 흐름은 TASK-002로 구현됐다.
+> **TASK-003(v2, 구현 완료)**: 카카오 로그인·표시 이름·재사용 지인 링크
+> 엔드포인트를 §6에 새로 추가했다 — §3의 엔드포인트는 코드/스키마 모두
+> 삭제하지 않고 그대로 남아 있지만(비활성 보존, `follows`와 같은 취급),
+> 지금 활성 그래프 edge 소스는 §6의 `acquaintance_confirmations` 경로뿐이다.
+> 설계 근거는 [03_INVITE_GRAPH_V2_SPEC.md](./03_INVITE_GRAPH_V2_SPEC.md) 참고.
+> §1(서버가 절대 받지 않는 것)과 §2(ZIP 파싱 계약)는 Instagram 경로가 후순위로
+> 남아있는 한 계속 유효하다.
+
 ## 1. 서버가 절대 받지 않는 것
 
 아래는 API 설계 이전에 먼저 정하는 제약이다. 엔드포인트 하나하나보다 이 목록이
@@ -125,9 +134,12 @@ B, 링크(/pair/{token}) 오픈
   ```ts
   type MeResult = {
     distanceCounts: { direct: number; within2: number; within3: number };
+    representativeDistances: number[]; // BFS distance 1~3, 최대 6개
   };
   ```
-- 그래프 노드/엣지, 중간 연결자는 포함하지 않는다.
+- `representativeDistances`는 화면 06의 고정 슬롯 미니 그래프에 사용할 실제 최단 거리의
+  익명 표본이다. 참여자 ID나 경로는 포함하지 않으며 최대 6개만 반환한다.
+- 그래프 노드/엣지, 중간 연결자의 신원은 포함하지 않는다.
 
 #### `POST /api/invites`
 
@@ -188,7 +200,93 @@ B, 링크(/pair/{token}) 오픈
 - **[TODO][Low]** 만료된 초대 재발급 UX: 현재는 새 `POST /api/invites`로 새
   토큰을 발급받는 것 외 별도 처리가 없다.
 
-## 5. Related Documents
+## 6. 지인 확인 그래프 v2 엔드포인트 (TASK-003, 구현 완료)
+
+설계 근거와 스키마는 [03_INVITE_GRAPH_V2_SPEC.md](./03_INVITE_GRAPH_V2_SPEC.md)
+참고 — 여기서는 실제 구현된 엔드포인트 계약만 정리한다.
+
+### 6.1 카카오 로그인
+
+#### `GET|POST /api/auth/[...nextauth]`
+
+- Auth.js(NextAuth v4)가 카카오 OAuth 시작/콜백을 모두 처리한다. 카카오 앱
+  키(`KAKAO_CLIENT_ID`/`KAKAO_CLIENT_SECRET`)와 `NEXTAUTH_SECRET`이 없으면
+  Auth.js에 위임하지 않고 503을 돌려준다(`isKakaoAuthConfigured()`).
+- 로그인 성공 콜백(`apps/web/lib/auth.ts`의 `signIn`)이
+  `(provider, providerAccountId)`로 participant를 찾거나 만들고, 기존
+  `sessions` 테이블 기반 httpOnly 쿠키를 발급한다(Auth.js 자체 세션은 쓰지
+  않음). 표시 이름이 없으면 `/login`으로, 있으면 `/result`로 리다이렉트한다
+  — 이 분기는 로그인을 어디서 시작했는지와 무관하게 항상 고정이다(지인
+  링크를 열었다가 로그인한 사람도 원래 링크로 자동 복귀하지 않는다, 알려진
+  한계).
+
+#### `PATCH /api/me/display-name`
+
+- **인증**: 세션 필수(401).
+- **요청**: `{ displayName: string }` — 트림 후 빈 문자열/공백, 30자 초과
+  거부(400).
+- **동작**: `participants.display_name` 갱신. 화면 02 최초 온보딩과 이후
+  설정 변경에 동일하게 쓴다.
+- **응답**: `{ ok: true }`.
+
+#### `GET /api/session` (v2 확장)
+
+- **인증**: 없음. 지금 세션의 로그인/표시 이름 설정 여부만 알려준다 —
+  참여자 신원은 절대 포함하지 않는다.
+- **응답**: `{ active: boolean, hasDisplayName: boolean }`. TASK-002까지는
+  `{ active }`만 있었다 — `hasDisplayName`이 이번에 추가됐다(기존 소비처인
+  `ReferralLanding.tsx`는 `active`만 읽으므로 하위 호환).
+
+### 6.2 지인 링크(재사용)
+
+#### `GET /api/links`
+
+- **인증**: 세션 필수(401).
+- **동작**: 호출자의 유효한(만료·폐기 안 된) 지인 링크를 그대로 돌려준다 —
+  회전하지 않는다. v2 명세 §3.2에는 명시되지 않았지만, 화면 03을 다시 열
+  때마다 `POST /api/links`를 부르면 이미 공유한 링크가 계속 깨지므로,
+  기존 `GET/POST /api/referral-link` 패턴과 대칭을 맞춰 조회 전용으로
+  추가했다.
+- **응답(성공)**: `{ token }`. **에러**: 아직 만든 적 없음(404).
+
+#### `POST /api/links`
+
+- **인증**: 세션 필수(401).
+- **동작**: 호출자의 기존 링크가 있으면 그대로 돌려주고, 없으면 새 링크를 만든다.
+  확인 인원 상한이나 만료 기간은 두지 않는다.
+- **응답**: `{ token }`.
+
+#### `GET /api/links/{token}`
+
+- **인증**: 없음(수신자가 로그인 전에 먼저 여는 화면 04이므로).
+- **응답**: `{ status: "valid" | "revoked" | "not-found", ownerDisplayName: string | null }`.
+  소유자의 participant id·해시는 포함하지 않는다.
+
+#### `POST /api/links/{token}/confirm`
+
+- **인증**: 세션 필수(수신자 본인, 401).
+- **동작**: 트랜잭션 안에서 링크의 존재와 폐기 여부를 확인한 뒤
+  `acquaintance_confirmations`에 삽입한다(이미 확인한
+  적 있으면 멱등하게 성공 처리).
+- **에러**: 없음(404) · 폐기됨(410) · 자기 자신의 링크(400).
+- **응답(성공)**: `{ ok: true }`.
+
+#### `GET /api/me/connections`
+
+- **인증**: 세션 필수(401).
+- **응답**: `{ connections: Array<{ displayName: string, confirmedAt: string }> }`.
+  삭제 기능이 없으므로 제거용 id는 포함하지 않는다.
+
+### 6.3 공개(탐색) 링크 — 표시 이름만 추가
+
+#### `GET /api/r/{token}` (v2 확장)
+
+- 기존 존재 확인 응답 `{}`가 `{ ownerDisplayName: string | null }`로
+  바뀌었다 — 소유자 신원(해시, participant id)은 여전히 포함하지 않는다.
+  이 링크를 여는 것만으로는 여전히 어떤 edge도 생기지 않는다(`referralLinks`/
+  `referralVisits` 테이블 구조와 edge-미생성 로직은 그대로).
+
+## 7. Related Documents
 
 - **Concept_Design**: N/A - [00_DEVELOPMENT_PRINCIPLES.md §6](./00_DEVELOPMENT_PRINCIPLES.md#6-related-documents)와
   동일한 사유.
@@ -196,3 +294,5 @@ B, 링크(/pair/{token}) 오픈
   Privacy-by-Design 원칙 및 전체 아키텍처 근거
 - **Technical_Specs**: [DB Schema](./01_DB_SCHEMA.md) - 이 엔드포인트들이 읽고
   쓰는 테이블 정의 및 식별자 해싱 설계
+- **Technical_Specs**: [Invite Graph v2 Spec](./03_INVITE_GRAPH_V2_SPEC.md) -
+  §6 엔드포인트들의 설계 근거(TASK-003)
