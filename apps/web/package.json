@@ -14,10 +14,10 @@
   "dependencies": {
     "@gai-ara/db": "workspace:*",
     "@gai-ara/graph": "workspace:*",
-    "@gai-ara/ig-parser": "workspace:*",
     "@gai-ara/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "next": "^16.3.4",
+    "next-auth": "^4.24.15",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.1"
