@@ -159,11 +159,12 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .referral-share-expand.is-expanded { grid-template-rows:1fr; opacity:1; }
 .referral-share-panel { min-height:0; overflow:hidden; }
 .result-share-toggle { background:#eef1e6; color:#3f6b4a; }
-.result-share-expand { justify-items:end; margin:-2px 0 10px; }
-.result-share-panel { display:flex; flex-direction:column; align-items:flex-end; gap:4px; padding-top:4px; text-align:right; max-width:240px; }
-.result-share-panel-title { margin:0; font-size:14px; font-weight:700; color:var(--color-deep-green); }
-.result-share-panel-desc { margin:0; font-size:12px; color:#7f827d; line-height:1.5; }
-.result-share-panel-actions { display:flex; align-items:center; gap:14px; margin-top:4px; }
+.result-share-sheet-backdrop { position:fixed; inset:0; z-index:20; background:rgba(74,52,35,.1); display:flex; align-items:flex-end; justify-content:center; }
+.result-share-sheet { position:relative; width:100%; max-width:420px; background:var(--color-cream); border-radius:24px 24px 0 0; padding:20px 24px 22px; box-shadow:0 -12px 32px -12px rgba(74,52,35,.35); text-align:center; }
+.result-share-sheet-close { position:absolute; top:10px; right:16px; background:none; border:none; font-size:16px; color:#8c9187; padding:6px; line-height:1; }
+.result-share-panel-title { margin:2px 0 4px; font-family:var(--font-rounded),var(--font-sans); font-size:19px; color:var(--color-deep-green); font-weight:400; }
+.result-share-panel-desc { margin:0; font-size:13px; color:#7f827d; line-height:1.6; }
+.result-share-panel-actions { display:flex; flex-direction:column; align-items:center; margin-top:14px; }
 .connections-list { display:flex; flex-direction:column; gap:8px; margin-top:16px; }.connections-list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border:1px solid #e7e3d8; border-radius:14px; text-align:left; }.connections-list-label { font-size:14px; font-weight:700; color:#18563a; overflow-wrap:anywhere; }.connections-list-status { font-size:12px; color:#7f827d; white-space:nowrap; }
 .referral-visits { display:flex; flex-direction:column; gap:6px; margin-top:10px; padding:0; list-style:none; }.referral-visits-item { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; padding:10px 14px; border:1px solid #e7e3d8; border-radius:12px; text-align:left; font-size:12px; background:white; font-family:inherit; cursor:pointer; }.referral-visits-item:hover { background:#f7f5ee; }.referral-visits-item span:first-child { font-weight:700; color:#18563a; overflow-wrap:anywhere; }.referral-visits-item span:last-child { color:#7f827d; white-space:nowrap; }
 .connections-radial { position:relative; width:min(300px,82vw); aspect-ratio:1; margin:28px auto 12px; }

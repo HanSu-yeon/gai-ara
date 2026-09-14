@@ -41,11 +41,10 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
 
-  async function handleToggleShareLink() {
+  async function handleOpenShareSheet() {
     if (preview) return;
-    const willOpen = !shareOpen;
-    setShareOpen(willOpen);
-    if (!willOpen || shareLink) return;
+    setShareOpen(true);
+    if (shareLink) return;
     setShareLoading(true);
     setShareError(null);
     try {
@@ -127,30 +126,12 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
   const isEmpty = result !== null && result.network.nodes.length === 0;
 
   const shareToggle = !preview ? (
-    <button type="button" className="small-link result-share-toggle" onClick={handleToggleShareLink} aria-expanded={shareOpen} aria-controls="result-share-panel">
+    <button type="button" className="small-link result-share-toggle" onClick={handleOpenShareSheet} aria-haspopup="dialog" aria-expanded={shareOpen}>
       공유하기<Icon name="link" />
     </button>
   ) : undefined;
 
   return <main className="brand-page result-page"><BrandHeader action={shareToggle} />
-    {!error && result && (
-      <div className={`referral-share-expand result-share-expand ${shareOpen ? "is-expanded" : ""}`}>
-        <section id="result-share-panel" className="referral-share-panel result-share-panel" aria-hidden={!shareOpen}>
-          <p className="result-share-panel-title">우리도 이어져 있을까?</p>
-          <p className="result-share-panel-desc">링크를 SNS에 공유해 확인해보세요.</p>
-          <div className="result-share-panel-actions">
-            {shareLoading && <p className="subtitle text-xs">만드는 중…</p>}
-            {shareLink && <>
-              <button type="button" className="text-link text-sm" onClick={handleShareLink} tabIndex={shareOpen ? 0 : -1}>공유하기</button>
-              <button type="button" className="text-link text-sm" onClick={handleCopyShareLink} tabIndex={shareOpen ? 0 : -1}>
-                {shareCopied ? "✓ 링크 복사됨" : "링크 복사"}
-              </button>
-            </>}
-            {shareError && <p className="error-message" role="alert">{shareError}</p>}
-          </div>
-        </section>
-      </div>
-    )}
     {error ? <><Character kind="search" className="result-character" /><h1 className="upload-heading">결과를 확인할 수 없어요</h1><p className="subtitle" role="alert">{error}</p><Link href="/login" className="primary-button mt-8">다시 로그인하기 <Icon name="arrow" /></Link></>
     : !result ? <section className="analysis-state" role="status"><h1 className="upload-heading">연결을 찾고 있어요</h1><Character kind="search" /><p className="subtitle">결과를 불러오고 있어요…</p><div className="progress-track" /></section>
     : <>
@@ -167,5 +148,24 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
         <button type="button" className="text-link text-xs" onClick={handleLogout}>로그아웃</button>
       </section>
 </>}
+    {shareOpen && (
+      <div className="result-share-sheet-backdrop" onClick={() => setShareOpen(false)}>
+        <div className="result-share-sheet" onClick={(event) => event.stopPropagation()}>
+          <button type="button" className="result-share-sheet-close" onClick={() => setShareOpen(false)} aria-label="닫기">✕</button>
+          <p className="result-share-panel-title">우리도 이어져 있을까?</p>
+          <p className="result-share-panel-desc">링크를 SNS에 공유해 확인해보세요.</p>
+          <div className="result-share-panel-actions">
+            {shareLoading && <p className="subtitle text-xs">만드는 중…</p>}
+            {shareLink && <>
+              <button type="button" className="primary-button mt-3" onClick={handleShareLink}>공유하기</button>
+              <button type="button" className="text-link text-sm mt-3" onClick={handleCopyShareLink}>
+                {shareCopied ? "✓ 링크 복사됨" : "링크 복사"}
+              </button>
+            </>}
+            {shareError && <p className="error-message" role="alert">{shareError}</p>}
+          </div>
+        </div>
+      </div>
+    )}
   </main>;
 }
