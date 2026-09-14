@@ -9,15 +9,12 @@ import { MiniConnectionGraph } from "@/components/MiniConnectionGraph";
 
 /**
  * 화면 06 — "내가 지금 누구와 어떻게 이어져 있는지 보는" 메인 화면이다.
- * 실제로 아는 사람에게 보내는 초대(관계 생성용)는 `/connect`의 역할이고,
- * 여기서는 다시 만들지 않는다 — 그래서 그래프 아래 secondary CTA 하나로
- * `/connect`로 보낼 뿐이다.
- *
- * `/r/{token}`(공개 링크, 몇 다리인지 자동 계산만 하고 관계는 만들지 않음)은
- * 커뮤니티/SNS 공유가 목적이라 `/connect`의 지인 초대와 맥락이 다르다
- * (2026-09-14 결정) — 헤더 우측의 작은 "공유하기"가 그 진입점이다.
- * 남의 `/r/{token}` 결과 화면에 있는 "나도 내 링크 만들기"와 같은
- * `getOrCreateReferralLink`를 쓰므로 토큰은 항상 재사용된다.
+ * 관계를 만드는 것(`/connect`)과 관계를 만들지 않고 몇 다리인지만 확인하는
+ * 것(`/r`, `getOrCreateReferralLink`로 owner당 토큰 재사용)은 서로 다른
+ * 진입점을 따로 두지 않고, 그래프 아래 "더 이어보기 →" 하나로 합쳐서 누르면
+ * 두 선택지를 보여주는 bottom sheet를 연다(2026-09-14 결정) — 화면
+ * 여기저기 흩어진 "공유하기"류 버튼이 서로 다른 화면(`/connect`에도
+ * "공유하기"가 있다)에서 같은 단어로 중복돼 헷갈리는 문제를 피하기 위함.
  */
 export function ResultScreen({ preview = false }: { preview?: boolean }) {
   const router = useRouter();
@@ -35,15 +32,25 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
     recoveryToken: "preview",
   } : null);
   const [error, setError] = useState<string | null>(null);
-  const [shareOpen, setShareOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetStep, setSheetStep] = useState<"choose" | "share">("choose");
   const [shareLink, setShareLink] = useState<ReferralLink | null>(null);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
 
-  async function handleOpenShareSheet() {
+  function handleOpenConnectSheet() {
     if (preview) return;
-    setShareOpen(true);
+    setSheetStep("choose");
+    setSheetOpen(true);
+  }
+
+  function handleCloseSheet() {
+    setSheetOpen(false);
+  }
+
+  async function handleChooseDistanceCheck() {
+    setSheetStep("share");
     if (shareLink) return;
     setShareLoading(true);
     setShareError(null);
@@ -125,13 +132,7 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
 
   const isEmpty = result !== null && result.network.nodes.length === 0;
 
-  const shareToggle = !preview ? (
-    <button type="button" className="small-link result-share-toggle" onClick={handleOpenShareSheet} aria-haspopup="dialog" aria-expanded={shareOpen}>
-      공유하기<Icon name="link" />
-    </button>
-  ) : undefined;
-
-  return <main className="brand-page result-page"><BrandHeader action={shareToggle} />
+  return <main className="brand-page result-page"><BrandHeader />
     {error ? <><Character kind="search" className="result-character" /><h1 className="upload-heading">결과를 확인할 수 없어요</h1><p className="subtitle" role="alert">{error}</p><Link href="/login" className="primary-button mt-8">다시 로그인하기 <Icon name="arrow" /></Link></>
     : !result ? <section className="analysis-state" role="status"><h1 className="upload-heading">연결을 찾고 있어요</h1><Character kind="search" /><p className="subtitle">결과를 불러오고 있어요…</p><div className="progress-track" /></section>
     : <>
@@ -139,31 +140,44 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
       {isEmpty ? <>
         <h1 className="upload-heading cluster-heading">여기서부터 이어져요</h1>
         <p className="subtitle cluster-subtitle">아직 이어진 사람이 없다면<br />아는 사람을 초대해보세요.</p>
-        <Link href="/connect" className="text-link text-sm mt-4">아는 사람 초대하기 →</Link>
       </> : <>
         <h1 className="upload-heading cluster-heading">내가 이어진 사람들</h1>
-        <Link href="/connect" className="text-link text-sm mt-4">아는 사람 더 연결하기 →</Link>
       </>}
+      {!preview && <button type="button" className="text-link text-sm mt-4" onClick={handleOpenConnectSheet}>더 이어보기 →</button>}
       <section className="result-footer">
         <button type="button" className="text-link text-xs" onClick={handleLogout}>로그아웃</button>
       </section>
 </>}
-    {shareOpen && (
-      <div className="result-share-sheet-backdrop" onClick={() => setShareOpen(false)}>
+    {sheetOpen && (
+      <div className="result-share-sheet-backdrop" onClick={handleCloseSheet}>
         <div className="result-share-sheet" onClick={(event) => event.stopPropagation()}>
-          <button type="button" className="result-share-sheet-close" onClick={() => setShareOpen(false)} aria-label="닫기">✕</button>
-          <p className="result-share-panel-title">우리도 이어져 있을까?</p>
-          <p className="result-share-panel-desc">링크를 SNS에 공유해 확인해보세요.</p>
-          <div className="result-share-panel-actions">
-            {shareLoading && <p className="subtitle text-xs">만드는 중…</p>}
-            {shareLink && <>
-              <button type="button" className="primary-button mt-3" onClick={handleShareLink}>공유하기</button>
-              <button type="button" className="text-link text-sm mt-3" onClick={handleCopyShareLink}>
-                {shareCopied ? "✓ 링크 복사됨" : "링크 복사"}
+          <button type="button" className="result-share-sheet-close" onClick={handleCloseSheet} aria-label="닫기">✕</button>
+          {sheetStep === "choose" ? <>
+            <p className="result-share-panel-title">어떻게 이어볼까요?</p>
+            <div className="result-connect-options">
+              <Link href="/connect" className="result-connect-option">
+                <span className="result-connect-option-title">아는 사람과 연결하기</span>
+                <span className="result-connect-option-desc">서로 아는 사이라고 확인하면 바로 이어져요.</span>
+              </Link>
+              <button type="button" className="result-connect-option" onClick={handleChooseDistanceCheck}>
+                <span className="result-connect-option-title">몇 다리인지 확인하기</span>
+                <span className="result-connect-option-desc">서로 모르는 사이여도 건너건너 이어져 있을 수 있어요.</span>
               </button>
-            </>}
-            {shareError && <p className="error-message" role="alert">{shareError}</p>}
-          </div>
+            </div>
+          </> : <>
+            <p className="result-share-panel-title">우리도 이어져 있을까?</p>
+            <p className="result-share-panel-desc">SNS나 단톡방에 링크를 공유해보세요.</p>
+            <div className="result-share-panel-actions">
+              {shareLoading && <p className="subtitle text-xs">만드는 중…</p>}
+              {shareLink && <>
+                <button type="button" className="primary-button mt-3" onClick={handleShareLink}>공유하기</button>
+                <button type="button" className="text-link text-sm mt-3" onClick={handleCopyShareLink}>
+                  {shareCopied ? "✓ 링크 복사됨" : "링크 복사"}
+                </button>
+              </>}
+              {shareError && <p className="error-message" role="alert">{shareError}</p>}
+            </div>
+          </>}
         </div>
       </div>
     )}
