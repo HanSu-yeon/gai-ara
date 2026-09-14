@@ -3,5 +3,6 @@ export { buildGraph } from "./buildGraph";
 export { bfsDistances, shortestDistance } from "./shortestPath";
 export { distanceCountsFrom } from "./stats";
 export type { DistanceCounts } from "./stats";
-export { buildEgoTree } from "./egoTree";
-export type { EgoTreeNode } from "./egoTree";
+export { buildLocalSubgraph } from "./localSubgraph";
+export type { LocalSubgraph, LocalSubgraphNode } from "./localSubgraph";
+export { shortestPathNodes } from "./shortestPathNodes";

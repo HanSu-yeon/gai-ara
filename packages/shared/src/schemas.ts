@@ -1,19 +1,35 @@
 import { z } from "zod";
 
 /**
- * 화면 06 미니 그래프 노드 하나. root(나) 자신은 포함하지 않는다.
- * `parentId`가 null이면 root에 직접 연결된 노드(depth 1)다. `displayName`은
- * 이 노드가 트리의 leaf(더 뻗어나가지 않는 끝)이고 표시 이름을 설정한
- * 참여자일 때만 채워진다 — 중간에 낀 연결자는 leaf가 아니므로 항상
- * `displayName: null`로 내려간다(v2 명세, 2026-09-14 결정).
+ * 화면 06(`/result`)이 쓰는, 나를 root로 한 최대 6홉 그래프(2026-09-14
+ * 최종 결정 — Six Degrees를 실제로 체감하는 화면이라 direct만으로는
+ * 부족하다). `parentId`는 레이아웃(각도 배치)용 BFS 트리 부모일 뿐이고,
+ * 실제로 그릴 선은 `edges` 전체다 — 트리 간선 + 트리에 없는 실제 간선
+ * (삼각형·재합류)까지 포함한다. `depth === 1`인 노드만 표시 이름이 채워지고
+ * (직접 아는 사람), `depth >= 2`는 항상 `displayName: null`이다 — 2촌
+ * 이상의 신원은 이 API 자체가 내려보내지 않는다(클라이언트에서 숨기는 게
+ * 아니라 서버 단계에서부터 제한).
+ *
+ * 렌더링 성능을 위해 2촌 이상 노드 수에는 상한이 있다 — 상한을 넘는
+ * 나머지는 노드를 만들어 붙이지 않고 `hiddenBeyondCount`라는 집계 숫자로만
+ * 알려준다(가짜 노드/간선을 추가하지 않는다는 원칙).
  */
-export const egoNetworkNodeSchema = z.object({
+export const meNetworkNodeSchema = z.object({
   id: z.string(),
   parentId: z.string().nullable(),
-  depth: z.number().int().min(1).max(3),
+  depth: z.number().int().min(1).max(6),
   displayName: z.string().nullable(),
 });
-export type EgoNetworkNode = z.infer<typeof egoNetworkNodeSchema>;
+export type MeNetworkNode = z.infer<typeof meNetworkNodeSchema>;
+
+export const meNetworkSchema = z.object({
+  nodes: z.array(meNetworkNodeSchema),
+  /** (id, id) 쌍 — 두 노드 다 `nodes`에 있고 실제로 confirmed 관계다. */
+  edges: z.array(z.tuple([z.string(), z.string()])),
+  /** 6홉 이내에는 있지만 렌더링 상한 때문에 노드로 내려보내지 않은 인원수. */
+  hiddenBeyondCount: z.number().int().nonnegative(),
+});
+export type MeNetwork = z.infer<typeof meNetworkSchema>;
 
 export const meResultSchema = z.object({
   distanceCounts: z.object({
@@ -21,24 +37,25 @@ export const meResultSchema = z.object({
     within2: z.number().int().nonnegative(),
     within3: z.number().int().nonnegative(),
   }),
-  /** 화면 06 미니 그래프에 그릴 익명 대표 경로의 BFS 거리(최대 6개). */
-  representativeDistances: z.array(z.number().int().min(1).max(3)).max(6),
-  /** 화면 06 미니 그래프가 실제로 쓰는, 나를 root로 한 2~3홉 이내 트리. */
-  network: z.array(egoNetworkNodeSchema),
+  /** 화면 06 미니 그래프가 실제로 쓰는, 나를 root로 한 최대 6홉 그래프. */
+  network: meNetworkSchema,
   /** 세션이 사라져도 "내 결과"로 돌아올 수 있는 개인용 복구 토큰. */
   recoveryToken: z.string(),
 });
 export type MeResult = z.infer<typeof meResultSchema>;
 
 /**
- * 두 참여자 사이의 거리 계산 결과 — `computePairResult`(graph-service)의
- * 반환 타입. `/api/r/{token}/result`(화면 08~10)가 이 함수를 그대로 쓴다.
+ * `/r/{token}` 결과 경로에 들어가는 노드 하나. `displayName`이 채워지는
+ * 경우는 두 endpoint(조회자 본인·링크 owner)이거나, 조회자 본인과 direct
+ * confirmed인 중간자뿐이다(2026-09-14 결정 — "내가 직접 아는 사람은
+ * 나에게 보이고, 내가 직접 모르는 사람은 익명이다"). 그 외에는 `id`도
+ * 실제 participant UUID가 아니라 불투명 해시다.
  */
-export const pairResultSchema = z.object({
-  status: z.enum(["pending", "connected", "unreachable"]),
-  distance: z.number().int().nonnegative().nullable(),
+export const referralPathNodeSchema = z.object({
+  id: z.string(),
+  displayName: z.string().nullable(),
 });
-export type PairResult = z.infer<typeof pairResultSchema>;
+export type ReferralPathNode = z.infer<typeof referralPathNodeSchema>;
 
 /** owner가 자기 링크로 들어온 방문자 한 명과의 결과를 다시 볼 때. */
 export const referralVisitSchema = z.object({
@@ -78,6 +95,12 @@ export type ReferralResultRequest = z.infer<typeof referralResultRequestSchema>;
 export const referralResultSchema = z.object({
   status: z.enum(["connected", "unreachable", "self"]),
   distance: z.number().int().nonnegative().nullable(),
+  /** connected일 때만 채워짐 — 조회자 자신부터 owner까지의 실제 경로.
+   * 중간자 이름 노출 규칙은 `referralPathNodeSchema` 참고. */
+  path: z.array(referralPathNodeSchema).nullable(),
+  /** unreachable일 때만 의미 있음 — 방문자 자신이 confirmed 관계가 하나도
+   * 없는 신규 참여자인지("내 그래프가 아직 시작 안 됨") 구분한다. */
+  visitorHasNoConnections: z.boolean().optional(),
 });
 export type ReferralResult = z.infer<typeof referralResultSchema>;
 

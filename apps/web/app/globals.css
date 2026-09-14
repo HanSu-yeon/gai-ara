@@ -103,17 +103,45 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 
 /* 화면 06 — 실제 BFS 거리만 받는 익명 미니 그래프. 위치는 참고 SVG의 6개 고정 슬롯이다. */
 .result-page .brand-header { margin-bottom:6px; }
-.mini-connection-graph { width:100%; max-width:390px; margin:0 auto 28px; }
+.mini-connection-graph { width:100%; max-width:390px; margin:0 auto 14px; }
+.mini-graph-more { margin-top:4px; font-size:11.5px; color:#8c9187; }
 .mini-connection-graph svg { display:block; width:100%; height:auto; overflow:visible; }
-.mini-graph-branches line { stroke:#c9d8cf; stroke-width:3; stroke-linecap:round; stroke-dasharray:1; stroke-dashoffset:1; animation:grow-branch 360ms ease-out forwards; }
-.mini-graph-node { opacity:0; transform-box:fill-box; transform-origin:center; animation:show-node 320ms ease-out forwards; }
-.mini-graph-mid { fill:#fffdf8; stroke:#8eb49d; stroke-width:2.5; }
-.mini-graph-leaf { fill:#ff8b2d; stroke:#fffdf8; stroke-width:2; }
-.mini-graph-leaf-label { fill:#1e5f42; font-family:var(--font-rounded),var(--font-sans); font-size:12px; font-weight:700; opacity:0; animation:show-node 320ms ease-out forwards; }
+.mini-graph-branches line { stroke:#d4dfd0; stroke-width:1.8; stroke-linecap:round; stroke-dasharray:1; stroke-dashoffset:1; animation:grow-branch 360ms ease-out forwards; transition:stroke .2s ease,opacity .2s ease,stroke-width .2s ease; }
+.mini-graph-branches line.is-highlighted { stroke:var(--color-tangerine); stroke-width:2.4; }
+.mini-graph-branches line.is-dimmed { opacity:.25; }
+.mini-graph-node { opacity:0; transform-box:fill-box; transform-origin:center; animation:show-node 320ms ease-out forwards; transition:opacity .2s ease; }
+/* 익명 중간자 — 옅은 mint 채움 + green 외곽선. */
+.mini-graph-mid { fill:var(--color-pale-mint); stroke:#8eb49d; stroke-width:2; }
+.mini-graph-mid.is-dimmed { opacity:.3; }
+/* 직접 아는 사람 — 꽉 찬 tangerine 원. */
+.mini-graph-direct { fill:var(--color-tangerine); stroke:var(--color-cream); stroke-width:1.5; }
+.mini-graph-direct.is-dimmed { opacity:.35; }
+.mini-graph-direct.is-selected { fill:var(--color-tangerine-dark); }
+/* /r로 발견한 endpoint — 속은 비우고 tangerine 외곽선만(직접과 구분).
+   선택돼도 이 "테두리만" 정체성은 유지한다 — 채움색이 바뀌면 direct(꽉 찬
+   원)와 헷갈린다(2026-09-14 지적). 선택 표시는 두꺼운 테두리 + 은은한
+   halo로만 한다. */
+.mini-graph-endpoint { fill:var(--color-cream); stroke:var(--color-tangerine); stroke-width:2.2; transition:stroke-width .2s ease,filter .2s ease; }
+.mini-graph-endpoint.is-dimmed { opacity:.35; }
+.mini-graph-endpoint.is-selected { stroke-width:3.4; filter:drop-shadow(0 0 3px var(--color-tangerine)); }
+.mini-graph-hit-area { fill:transparent; }
+.mini-graph-clickable { cursor:pointer; }
+/* paint-order로 텍스트 뒤에 크림색 테두리(halo)를 깔아, 선/다른 노드와
+   겹쳐도 라벨이 항상 읽히게 한다 — 별도 충돌 회피 레이아웃 없이 저렴하게
+   해결한다. */
+.mini-graph-leaf-label { fill:#1e5f42; font-family:var(--font-rounded),var(--font-sans); font-size:11.5px; font-weight:700; paint-order:stroke; stroke:var(--color-cream); stroke-width:3px; stroke-linejoin:round; opacity:0; animation:show-node 320ms ease-out forwards; transition:opacity .2s ease; }
+.mini-graph-leaf-label.is-dimmed { opacity:.35; }
 .mini-graph-me { opacity:0; animation:show-node 320ms ease-out forwards; }
 .mini-graph-me-character { animation:mini-graph-float 3.6s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
 .mini-graph-me text { fill:#1e5f42; font-family:var(--font-rounded),var(--font-sans); font-size:16px; font-weight:400; }
-.cluster-heading { font-size:26px; text-align:center; margin-top:0; }
+.mini-graph-sheet-backdrop { position:fixed; inset:0; z-index:20; background:rgba(74,52,35,.28); display:flex; align-items:flex-end; justify-content:center; }
+.mini-graph-sheet { position:relative; width:100%; max-width:420px; background:var(--color-cream); border-radius:24px 24px 0 0; padding:18px 24px 16px; box-shadow:0 -12px 32px -12px rgba(74,52,35,.35); text-align:center; }
+.mini-graph-sheet-close { position:absolute; top:10px; right:16px; background:none; border:none; font-size:16px; color:#8c9187; padding:6px; line-height:1; }
+.mini-graph-sheet h3 { margin:2px 0 4px; font-family:var(--font-rounded),var(--font-sans); font-size:19px; color:var(--color-deep-green); font-weight:400; }
+.mini-graph-sheet-headline { font-family:var(--font-rounded),var(--font-sans); font-size:16px; color:var(--color-tangerine-dark); font-weight:700; margin:0 0 4px; }
+.mini-graph-sheet .subtitle { margin:2px 0; font-size:13px; }
+.mini-graph-sheet .connection-path { margin-top:10px; }
+.cluster-heading { font-size:20px; text-align:center; margin-top:0; }
 .cluster-subtitle { text-align:center; margin-top:8px; }
 .result-footer { margin-top:24px; }
 @keyframes grow-branch { to { stroke-dashoffset:0; } }
@@ -125,7 +153,11 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .connection-path svg { display:block; width:100%; height:auto; overflow:visible; }
 .connection-path-lines line { stroke:#8eb49d; stroke-width:2.5; stroke-linecap:round; }
 .connection-path-dot { fill:#fffdf8; stroke:#8eb49d; stroke-width:2.5; }
-.connection-path-labels { display:flex; justify-content:space-between; margin-top:2px; font-size:11px; font-weight:700; color:var(--color-deep-green); }
+.connection-path-named { fill:#ff8b2d; stroke:#fffdf8; stroke-width:2; }
+.connection-path-label { fill:#1e5f42; font-family:var(--font-rounded),var(--font-sans); font-size:11.5px; font-weight:700; }
+.referral-share-expand { display:grid; grid-template-rows:0fr; opacity:0; transition:grid-template-rows .32s ease,opacity .24s ease; }
+.referral-share-expand.is-expanded { grid-template-rows:1fr; opacity:1; }
+.referral-share-panel { min-height:0; overflow:hidden; }
 .connections-list { display:flex; flex-direction:column; gap:8px; margin-top:16px; }.connections-list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border:1px solid #e7e3d8; border-radius:14px; text-align:left; }.connections-list-label { font-size:14px; font-weight:700; color:#18563a; overflow-wrap:anywhere; }.connections-list-status { font-size:12px; color:#7f827d; white-space:nowrap; }
 .referral-visits { display:flex; flex-direction:column; gap:6px; margin-top:10px; padding:0; list-style:none; }.referral-visits-item { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; padding:10px 14px; border:1px solid #e7e3d8; border-radius:12px; text-align:left; font-size:12px; background:white; font-family:inherit; cursor:pointer; }.referral-visits-item:hover { background:#f7f5ee; }.referral-visits-item span:first-child { font-weight:700; color:#18563a; overflow-wrap:anywhere; }.referral-visits-item span:last-child { color:#7f827d; white-space:nowrap; }
 .connections-radial { position:relative; width:min(300px,82vw); aspect-ratio:1; margin:28px auto 12px; }

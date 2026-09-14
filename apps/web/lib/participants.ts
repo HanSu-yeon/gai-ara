@@ -221,3 +221,21 @@ export async function getAllEdges(): Promise<Array<{ a: string; b: string }>> {
   `);
   return [...result].map((row) => ({ a: row.a, b: row.b }));
 }
+
+/**
+ * 이 참여자가 확정된 관계를 하나라도 갖고 있는지("edge가 0개인 신규
+ * 참여자인지")만 저렴하게 확인한다 — `/r/{token}` path-not-found 화면이
+ * "아직 내 그래프가 시작 안 됨"과 "그래프는 있지만 이 상대까지는 아직
+ * 못 닿음"을 구분해서 보여주기 위해 쓴다(2026-09-14 결정).
+ */
+export async function hasAnyConfirmedConnection(participantId: string): Promise<boolean> {
+  const db = getDb();
+  const result = await db.execute<{ exists: boolean }>(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM acquaintance_confirmations ac
+      JOIN acquaintance_links al ON al.id = ac.link_id
+      WHERE al.owner_participant_id = ${participantId} OR ac.confirmer_participant_id = ${participantId}
+    ) AS exists
+  `);
+  return [...result][0]?.exists ?? false;
+}

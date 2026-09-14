@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getReferralLinkOwner, recordReferralVisit } from "@/lib/referral-links";
 import { getSessionParticipantId } from "@/lib/session";
-import { computePairResult } from "@/lib/graph-service";
+import { hasAnyConfirmedConnection } from "@/lib/participants";
+import { computeReferralResult } from "@/lib/graph-service";
 import { isBackendConfigured } from "@/lib/env";
 
 /**
@@ -32,17 +33,19 @@ export async function POST(
   }
 
   if (participantId === link.ownerParticipantId) {
-    return NextResponse.json({ status: "self", distance: null });
+    return NextResponse.json({ status: "self", distance: null, path: null });
   }
 
   const body = await request.json().catch(() => ({}));
   const nickname = typeof body?.nickname === "string" ? body.nickname : undefined;
 
-  const result = await computePairResult(link.ownerParticipantId, participantId);
-  // computePairResult는 recipient가 null일 때 "pending"을 반환하지만, 여기서는
-  // participantId가 항상 존재하므로 "pending"이 나올 일이 없다 — connected 또는
-  // unreachable만 반환된다.
-  await recordReferralVisit(link.id, participantId, nickname, result.status as "connected" | "unreachable", result.distance);
+  const result = await computeReferralResult(link.ownerParticipantId, participantId);
+  await recordReferralVisit(link.id, participantId, nickname, result.status, result.distance);
 
-  return NextResponse.json({ status: result.status, distance: result.distance });
+  // "아직 내 그래프 자체가 시작 안 됨"(신규 참여자, edge 0개)과 "그래프는
+  // 있지만 이 상대까지는 아직 못 닿음"을 화면에서 구분해서 보여주기 위한
+  // 신호 — unreachable일 때만 계산한다(2026-09-14 결정).
+  const visitorHasNoConnections = result.status === "unreachable" ? !(await hasAnyConfirmedConnection(participantId)) : false;
+
+  return NextResponse.json({ status: result.status, distance: result.distance, path: result.path, visitorHasNoConnections });
 }

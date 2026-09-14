@@ -16,7 +16,7 @@ import { loginPathFor } from "@/lib/return-to";
  * 화면 카피에 별도 "만들기" 버튼이 없어 방문 즉시 공유 버튼을 보여준다
  * (§apps/web/lib/acquaintance-links.ts 참고).
  */
-export default function ConnectScreen() {
+export default function ConnectScreen({ returnTo = null }: { returnTo?: string | null }) {
   const router = useRouter();
   const [link, setLink] = useState<AcquaintanceLink | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,7 +31,7 @@ export default function ConnectScreen() {
     fetch("/api/links")
       .then(async (response) => {
         if (response.status === 401) {
-          router.replace(loginPathFor("/connect"));
+          router.replace(loginPathFor(returnTo ?? "/connect"));
           return;
         }
         if (response.ok) {
@@ -42,7 +42,7 @@ export default function ConnectScreen() {
         if (response.status === 404) {
           const created = await fetch("/api/links", { method: "POST" });
           if (created.status === 401) {
-            router.replace("/login");
+            router.replace(loginPathFor(returnTo ?? "/connect"));
             return;
           }
           if (created.ok) {
@@ -58,7 +58,7 @@ export default function ConnectScreen() {
         setError("링크를 만들지 못했어요. 잠시 후 다시 시도해주세요.");
         setLoading(false);
       });
-  }, [router]);
+  }, [router, returnTo]);
 
   const inviteUrl = link ? `${typeof window !== "undefined" ? window.location.origin : ""}/invite/${link.token}` : "";
 
@@ -119,7 +119,11 @@ export default function ConnectScreen() {
       <div className="acquaintance-link-note">
         <strong>실제로 아는 사람에게만 보내주세요.</strong>
       </div>
-      <Link href="/result" className="text-link text-xs mt-4">이어진 사람 보기 →</Link>
+      {returnTo ? (
+        <Link href={returnTo} className="text-link text-xs mt-4">원래 확인하던 페이지로 돌아가기 →</Link>
+      ) : (
+        <Link href="/result" className="text-link text-xs mt-4">이어진 사람 보기 →</Link>
+      )}
     </main>
   );
 }

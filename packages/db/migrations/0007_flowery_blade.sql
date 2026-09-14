@@ -1,0 +1,1 @@
+ALTER TABLE "referral_visits" ADD COLUMN "revealed_to_owner" boolean DEFAULT false NOT NULL;

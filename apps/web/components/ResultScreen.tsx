@@ -22,12 +22,15 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
   const router = useRouter();
   const [result, setResult] = useState<MeResult | null>(preview ? {
     distanceCounts: { direct: 2, within2: 4, within3: 6 },
-    representativeDistances: [1, 2, 3, 1, 2, 3],
-    network: [
-      { id: "p1", parentId: null, depth: 1, displayName: null },
-      { id: "p2", parentId: "p1", depth: 2, displayName: "미리보기" },
-      { id: "p3", parentId: null, depth: 1, displayName: "수연" },
-    ],
+    network: {
+      nodes: [
+        { id: "p1", parentId: null, depth: 1, displayName: "수연" },
+        { id: "p2", parentId: "p1", depth: 2, displayName: null },
+        { id: "p3", parentId: "p2", depth: 3, displayName: null },
+      ],
+      edges: [["p1", "p2"], ["p2", "p3"]],
+      hiddenBeyondCount: 0,
+    },
     recoveryToken: "preview",
   } : null);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +66,7 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
     };
   }, [loadResult, preview]);
 
-  const isEmpty = result !== null && result.network.length === 0;
+  const isEmpty = result !== null && result.network.nodes.length === 0;
 
   return <main className="brand-page result-page"><BrandHeader />
     {error ? <><Character kind="search" className="result-character" /><h1 className="upload-heading">결과를 확인할 수 없어요</h1><p className="subtitle" role="alert">{error}</p><Link href="/login" className="primary-button mt-8">다시 로그인하기 <Icon name="arrow" /></Link></>
@@ -75,8 +78,7 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
         <p className="subtitle cluster-subtitle">아직 이어진 사람이 없다면<br />아는 사람을 초대해보세요.</p>
         <Link href="/connect" className="text-link text-sm mt-4">아는 사람 초대하기 →</Link>
       </> : <>
-        <h1 className="upload-heading cluster-heading">조금씩 이어지고 있어요</h1>
-        <p className="subtitle cluster-subtitle">아는 사람들이 더 참여하면<br />새로운 사이를 발견할 수도 있어요.</p>
+        <h1 className="upload-heading cluster-heading">내가 이어진 사람들</h1>
         <Link href="/connect" className="text-link text-sm mt-4">아는 사람 더 초대하기 →</Link>
       </>}
       <section className="result-footer">

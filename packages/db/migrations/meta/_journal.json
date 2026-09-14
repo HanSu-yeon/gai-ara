@@ -50,6 +50,13 @@
       "when": 1789298592527,
       "tag": "0006_outstanding_living_mummy",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789357278427,
+      "tag": "0007_flowery_blade",
+      "breakpoints": true
     }
   ]
 }

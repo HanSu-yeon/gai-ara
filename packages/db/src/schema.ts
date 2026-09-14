@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   pgTable,
   text,
@@ -175,6 +176,12 @@ export const referralLinks = pgTable("referral_links", {
  * 결정), distance/status는 계산 결과다. 같은 방문자가 다시 확인하면
  * (ownerParticipantId, visitorParticipantId) 유니크 제약으로 덮어쓴다 —
  * 방문할 때마다 새 행이 쌓이지 않는다.
+ *
+ * revealedToOwner: 2026-09-14 결정 — 방문자가 링크를 열어 owner와의 연결을
+ * 발견했다는 사실만으로는 owner의 `/result`에 실명 endpoint로 나타나지
+ * 않는다(기본값 false, 익명). 방문자가 화면에서 명시적으로 "내 이름
+ * 보여주기"를 선택했을 때만 true로 바뀌고, 그때만 owner 쪽 그래프에
+ * 이름이 보인다 — opt-in이 없으면 절대 켜지지 않는다.
  */
 export const referralVisits = pgTable("referral_visits", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -187,6 +194,7 @@ export const referralVisits = pgTable("referral_visits", {
   nickname: text("nickname"),
   status: text("status", { enum: ["connected", "unreachable"] }).notNull(),
   distance: integer("distance"),
+  revealedToOwner: boolean("revealed_to_owner").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   visitorUnique: uniqueIndex("referral_visits_link_visitor_key").on(

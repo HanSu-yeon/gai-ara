@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, participants, referralLinks, referralVisits } from "@gai-ara/db";
 
 export interface ReferralLinkRecord {
@@ -141,4 +141,65 @@ export async function getReferralVisitsForOwner(ownerParticipantId: string): Pro
     status: status as "connected" | "unreachable",
     distance,
   }));
+}
+
+/**
+ * `/result`가 "내가 발견한 연결"에 포함할 두 whitelist 중 A방향 —
+ * 내가 방문자로서 남의 `/r` 링크를 열어 실제 path를 발견한 owner들.
+ * 나는 이미 화면 08에서 그 사람 이름을 봤으므로(그 사람이 자기 링크를
+ * 공유하며 스스로 공개한 정보) 새로운 신원 노출이 아니다 — 그래서 별도
+ * 동의 없이 항상 포함한다(2026-09-14 결정).
+ */
+export async function getDiscoveredReferralOwners(visitorParticipantId: string): Promise<string[]> {
+  const db = getDb();
+  const rows = await db
+    .selectDistinct({ ownerParticipantId: referralLinks.ownerParticipantId })
+    .from(referralVisits)
+    .innerJoin(referralLinks, eq(referralVisits.referralLinkId, referralLinks.id))
+    .where(and(eq(referralVisits.visitorParticipantId, visitorParticipantId), eq(referralVisits.status, "connected")));
+
+  return rows.map((row) => row.ownerParticipantId);
+}
+
+/**
+ * B방향 whitelist — 남이 내 링크를 열어 나와의 연결을 발견했지만, 그
+ * 사실만으로는 내 `/result`에 실명으로 나타나지 않는다(2026-09-14 결정:
+ * "확인하러 왔다"는 자기 신원을 owner에게 공개하겠다는 동의가 아니다).
+ * `revealed_to_owner`가 true인, 즉 방문자가 화면에서 명시적으로 "내 이름
+ * 보여주기"를 선택한 행만 돌려준다.
+ */
+export async function getRevealedReferralVisitors(ownerParticipantId: string): Promise<string[]> {
+  const db = getDb();
+  const rows = await db
+    .select({ visitorParticipantId: referralVisits.visitorParticipantId })
+    .from(referralVisits)
+    .innerJoin(referralLinks, eq(referralVisits.referralLinkId, referralLinks.id))
+    .where(
+      and(
+        eq(referralLinks.ownerParticipantId, ownerParticipantId),
+        eq(referralVisits.status, "connected"),
+        eq(referralVisits.revealedToOwner, true),
+      ),
+    );
+
+  return rows.map((row) => row.visitorParticipantId);
+}
+
+/**
+ * 방문자 본인이 "내 이름을 링크 주인에게 보여줄까요?"에 명시적으로
+ * 동의했을 때만 호출한다 — opt-in이므로 기본값은 항상 false다. 아직
+ * `recordReferralVisit`으로 만들어진 행이 없으면(비정상 순서로 호출된
+ * 경우) 아무 것도 하지 않는다.
+ */
+export async function revealVisitToOwner(referralLinkId: string, visitorParticipantId: string): Promise<void> {
+  const db = getDb();
+  await db
+    .update(referralVisits)
+    .set({ revealedToOwner: true })
+    .where(
+      and(
+        eq(referralVisits.referralLinkId, referralLinkId),
+        eq(referralVisits.visitorParticipantId, visitorParticipantId),
+      ),
+    );
 }

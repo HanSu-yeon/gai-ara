@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import type { ReferralResult, SessionInfo } from "@gai-ara/shared";
+import type { ReferralLink, ReferralResult, SessionInfo } from "@gai-ara/shared";
 import { BrandHeader, Centered, Character, StatusMessage } from "@/components/Brand";
 import { ConnectionPath } from "@/components/ConnectionPath";
 import { formatConnectionHeadline, formatConnectionSubtitle, formatIntermediaryPhrase } from "@/lib/distance-copy";
@@ -64,6 +64,13 @@ export function ReferralLanding() {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+  const [myLink, setMyLink] = useState<ReferralLink | null>(null);
+  const [myLinkExpanded, setMyLinkExpanded] = useState(false);
+  const [myLinkCreating, setMyLinkCreating] = useState(false);
+  const [myLinkError, setMyLinkError] = useState<string | null>(null);
+  const [myLinkCopied, setMyLinkCopied] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+  const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
     fetch("/api/session")
@@ -158,6 +165,83 @@ export function ReferralLanding() {
     }
   }
 
+  /**
+   * "나도 내 링크 만들기" — 바이럴 루프의 다음 고리. `/result`에는 이
+   * 진입점을 두지 않기로 했으니(같은 화면에 공유 기능 중복 금지, 2026-09-14
+   * 결정) 정작 "몇 다리 건너"의 wow moment를 막 겪은 이 화면(09)에 둔다.
+   * 기존 링크가 있으면 그대로 보여줄 뿐 회전시키지 않는다(ConnectScreen과
+   * 같은 규칙).
+   */
+  async function handleToggleMyLink() {
+    const willExpand = !myLinkExpanded;
+    setMyLinkExpanded(willExpand);
+    if (!willExpand || myLink) return;
+    setMyLinkCreating(true);
+    setMyLinkError(null);
+    try {
+      const response = await fetch("/api/referral-link");
+      if (response.ok) {
+        setMyLink((await response.json()) as ReferralLink);
+        return;
+      }
+      if (response.status === 404) {
+        const created = await fetch("/api/referral-link", { method: "POST" });
+        if (!created.ok) throw new Error();
+        setMyLink((await created.json()) as ReferralLink);
+        trackEvent("referral_link_create", { source: "referral_result" });
+      } else {
+        throw new Error();
+      }
+    } catch {
+      setMyLinkError("링크를 만들지 못했어요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setMyLinkCreating(false);
+    }
+  }
+
+  async function handleCopyMyLink() {
+    if (!myLink) return;
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/r/${myLink.token}`);
+      setMyLinkCopied(true);
+      trackEvent("referral_link_copy", { source: "referral_result" });
+      window.setTimeout(() => setMyLinkCopied(false), 1800);
+    } catch {
+      setMyLinkError("자동 복사가 되지 않아요. 링크를 길게 눌러 직접 복사해주세요.");
+    }
+  }
+
+  async function handleShareMyLink() {
+    if (!myLink) return;
+    const url = `${window.location.origin}/r/${myLink.token}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "가이 알아?", text: "우리 몇 다리 건너 아는 사이인지 확인해봐요.", url });
+        trackEvent("referral_link_share", { source: "referral_result" });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+    await handleCopyMyLink();
+  }
+
+  /**
+   * "내 이름 보여주기" — 기본은 항상 익명이고(2026-09-14 결정), 방문자가
+   * 이걸 명시적으로 눌러야만 owner의 `/result`에 실명 endpoint로 나타난다.
+   * 새 관계(edge)를 만들지 않는다 — 이미 있는 방문 기록의 공개 여부만
+   * 바꾼다.
+   */
+  async function handleReveal() {
+    setRevealing(true);
+    try {
+      const response = await fetch(`/api/r/${token}/reveal`, { method: "POST" });
+      if (response.ok) setRevealed(true);
+    } finally {
+      setRevealing(false);
+    }
+  }
+
   if (session === null || linkStatus === "loading") {
     return (
       <Centered character="search">
@@ -190,6 +274,30 @@ export function ReferralLanding() {
     const ctaHref = session.hasDisplayName ? "/connect" : "/login";
 
     if (result.status === "unreachable") {
+      // "내 그래프 자체가 아직 시작 안 됨"(confirmed 관계 0개인 신규
+      // 참여자)과 "그래프는 있지만 이 상대까지는 아직 못 닿음"을 구분해서
+      // 보여준다(2026-09-14 결정) — 전자에게 "연결을 찾지 못했어요"라고만
+      // 하면 계산 기반 자체가 없다는 걸 설명하지 못한다.
+      if (result.visitorHasNoConnections) {
+        return (
+          <main className="brand-page">
+            <BrandHeader />
+            <div className="duo-art" role="img" aria-label="아직 연결이 시작되지 않은 귤 캐릭터 두 마리">
+              <Character kind="curious" />
+              <span className="duo-dots" aria-hidden="true">···</span>
+              <Character kind="curious" className="duo-character-flip" />
+            </div>
+            <h1 className="upload-heading">아직 몇 다리인지<br />확인하기 어려워요</h1>
+            <p className="subtitle">
+              아는 사람과 먼저 이어지면
+              <br />
+              {ownerDisplayName ?? "상대"}님까지 이어지는 길을 찾아볼 수 있어요.
+            </p>
+            <Link href={`/connect?returnTo=${encodeURIComponent(`/r/${token}`)}`} className="primary-button mt-6">아는 사람에게 보내기</Link>
+          </main>
+        );
+      }
+
       // 실제로 관계가 없다는 단정이 아니라, 현재 참여 데이터 안에서 아직
       // 경로를 못 찾았다는 뜻이다 — 헤드라인·설명 문구가 이 의미를 지켜야
       // 한다. 재계산은 이 화면에서 다시 시도하지 않고, 다음에 /r/{token}에
@@ -203,11 +311,11 @@ export function ReferralLanding() {
             <span className="duo-dots" aria-hidden="true">···</span>
             <Character kind="curious" className="duo-character-flip" />
           </div>
-          <h1 className="upload-heading">아직 연결을<br />찾지 못했어요</h1>
+          <h1 className="upload-heading">아직 이어지는 길을<br />찾지 못했어요</h1>
           <p className="subtitle">
             현재 참여한 사람들 사이에서는
             <br />
-            아직 이어지는 길을 찾지 못했어요.
+            아직 {ownerDisplayName ?? "상대"}님까지 이어지는 길을 찾지 못했어요.
           </p>
           <p className="subtitle mt-2">
             아는 사람들이 더 참여하면
@@ -220,6 +328,7 @@ export function ReferralLanding() {
     }
 
     const distance = result.distance ?? 1;
+    const path = result.path ?? [];
     const headline = formatConnectionHeadline(distance);
     const shareText = `가이 알아? ${formatIntermediaryPhrase(distance)} ${typeof window !== "undefined" ? window.location.origin : ""} 에서 확인해보세요!`;
 
@@ -227,12 +336,35 @@ export function ReferralLanding() {
       <main className="brand-page">
         <BrandHeader />
         <h1 className="upload-heading">{headline.top}<br />{headline.bottom}</h1>
-        <ConnectionPath intermediaries={Math.max(distance - 1, 0)} />
+        <ConnectionPath path={path} />
         <p className="subtitle mt-4">{formatConnectionSubtitle(distance)}</p>
+        {distance > 1 && (
+          revealed ? (
+            <p className="result-note mt-3">✓ {ownerDisplayName ?? "상대"}님에게 내 이름을 보여줬어요.</p>
+          ) : (
+            <button type="button" className="text-link text-sm mt-3" onClick={handleReveal} disabled={revealing}>
+              {revealing ? "보여주는 중…" : `${ownerDisplayName ?? "상대"}님에게 내 이름 보여주기`}
+            </button>
+          )
+        )}
         <button type="button" className="primary-button mt-6" onClick={() => handleShare(shareText)} disabled={sharing}>
           {sharing ? "공유하는 중…" : "결과 공유하기"}
         </button>
         <Link href={ctaHref} className="text-link text-xs mt-4">나도 시작하기</Link>
+        <button type="button" className="text-link text-xs mt-2" onClick={handleToggleMyLink} disabled={myLinkCreating} aria-expanded={myLinkExpanded} aria-controls="my-referral-panel">
+          {myLinkCreating ? "만드는 중…" : `나도 내 링크 만들기 ${myLinkExpanded ? "↑" : "→"}`}
+        </button>
+        <div className={`referral-share-expand ${myLinkExpanded ? "is-expanded" : ""}`}>
+          <section id="my-referral-panel" className="referral-share-panel" aria-hidden={!myLinkExpanded}>
+            {myLink && <>
+              <button type="button" className="primary-button mt-3" onClick={handleShareMyLink} tabIndex={myLinkExpanded ? 0 : -1}>공유하기</button>
+              <button type="button" className="text-link text-sm mt-3" onClick={handleCopyMyLink} tabIndex={myLinkExpanded ? 0 : -1}>
+                {myLinkCopied ? "✓ 링크 복사됨" : "링크 복사"}
+              </button>
+            </>}
+            {myLinkError && <p className="error-message" role="alert">{myLinkError}</p>}
+          </section>
+        </div>
         {shareMessage && <p className="result-note" role="status">{shareMessage}</p>}
       </main>
     );
