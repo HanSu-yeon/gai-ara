@@ -136,8 +136,8 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
     {!error && result && (
       <div className={`referral-share-expand result-share-expand ${shareOpen ? "is-expanded" : ""}`}>
         <section id="result-share-panel" className="referral-share-panel result-share-panel" aria-hidden={!shareOpen}>
-          <p className="result-share-panel-title">나와 몇 다리 건너일까요?</p>
-          <p className="result-share-panel-desc">링크를 공유하면 나와 몇 다리 건너인지 확인할 수 있어요.</p>
+          <p className="result-share-panel-title">우리도 이어져 있을까?</p>
+          <p className="result-share-panel-desc">링크를 SNS에 공유해 확인해보세요.</p>
           <div className="result-share-panel-actions">
             {shareLoading && <p className="subtitle text-xs">만드는 중…</p>}
             {shareLink && <>
@@ -161,7 +161,7 @@ export function ResultScreen({ preview = false }: { preview?: boolean }) {
         <Link href="/connect" className="text-link text-sm mt-4">아는 사람 초대하기 →</Link>
       </> : <>
         <h1 className="upload-heading cluster-heading">내가 이어진 사람들</h1>
-        <Link href="/connect" className="text-link text-sm mt-4">아는 사람 더 초대하기 →</Link>
+        <Link href="/connect" className="text-link text-sm mt-4">아는 사람 더 연결하기 →</Link>
       </>}
       <section className="result-footer">
         <button type="button" className="text-link text-xs" onClick={handleLogout}>로그아웃</button>
