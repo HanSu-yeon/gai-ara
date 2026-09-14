@@ -121,6 +121,132 @@ export const updateDisplayNameSchema = z.object({
 export type UpdateDisplayNameInput = z.infer<typeof updateDisplayNameSchema>;
 
 /**
+ * `POST /api/instagram-import` 요청 — 2026-09-14 Instagram import
+ * 재도입. 클라이언트(`@gai-ara/ig-parser`)가 브라우저에서 ZIP을 열어
+ * followers ∩ following까지 계산한 뒤, 그 결과(맞팔 목록)만 여기로
+ * 보낸다 — 원본 followers/following 전체 목록이나 ZIP 자체는 절대
+ * 서버로 오지 않는다. 로그인은 이미 카카오 세션으로 끝난 상태라야 하므로
+ * (§ `AGENTS.md` §0 각주), 여기엔 로그인용 필드가 없다.
+ */
+export const instagramImportSchema = z.object({
+  selfUsername: z.string().min(1).max(60),
+  mutualUsernames: z.array(z.string().min(1).max(60)).max(20_000),
+});
+export type InstagramImportInput = z.infer<typeof instagramImportSchema>;
+
+/** `POST /api/instagram-import` 응답 — 실제로 계산된 맞팔 수만 돌려준다. */
+export const instagramImportResultSchema = z.object({
+  mutualCount: z.number().int().nonnegative(),
+});
+export type InstagramImportResult = z.infer<typeof instagramImportResultSchema>;
+
+/**
+ * `POST /api/challenges` 요청 — 2026-09-14 "타겟 챌린지" 기능, 2026-09-15
+ * "협업형 챌린지"로 결과 모델 변경(아래 `challengeProgressSchema` 참고).
+ * displayName은 챌린지 화면에 보여줄 표시 이름일 뿐 검증된 인물명이 아니다
+ * — "궁금한 사람"이면 누구든 대상이 될 수 있고 유명인으로 한정하지
+ * 않는다. instagramUsername은 해싱 직후 버려진다(서버 로그·응답에 절대
+ * 남기지 않는다) — `hashInstagramUsername()`으로 만든 해시만 저장한다.
+ */
+export const createChallengeSchema = z.object({
+  displayName: z.string().trim().min(1).max(30),
+  instagramUsername: z.string().trim().min(1).max(60),
+});
+export type CreateChallengeInput = z.infer<typeof createChallengeSchema>;
+
+/**
+ * `POST /api/challenges` 응답 — 2026-09-15 결정, 동일 target(정규화된
+ * username의 해시, `target_challenges.target_instagram_username_hash`
+ * UNIQUE)으로는 챌린지를 중복 생성하지 않는다.
+ *
+ * - `status: "created"` — 새 챌린지를 만들었다. 호출자는 이미
+ *   `challenge_participants`의 첫 참여자로 등록돼 있다.
+ * - `status: "duplicate"` — 같은 target을 가리키는 챌린지가 이미 있다.
+ *   **호출자를 그 챌린지에 자동으로 합류시키지 않는다** — 클라이언트가
+ *   "이미 있어요, 합류할까요?" 화면을 먼저 보여주고, 사용자가 명시적으로
+ *   동의해야만 `POST /api/challenges/{token}/join`을 호출한다. 기존
+ *   챌린지의 `displayName`을 그대로 돌려준다 — 이번에 제출한 displayName은
+ *   버려진다(최초 생성 시점 값을 덮어쓰지 않는다).
+ */
+export const createChallengeResultSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("created"), token: z.string() }),
+  z.object({ status: z.literal("duplicate"), token: z.string(), displayName: z.string() }),
+]);
+export type CreateChallengeResult = z.infer<typeof createChallengeResultSchema>;
+
+/**
+ * 2026-09-15 협업형 챌린지 결정 — 챌린지 결과는 더 이상 "뷰어 개인 기준
+ * connected/not_connected"가 아니라, 이 챌린지에 명시적으로 참여한
+ * participant들(start-set)에서 출발해 전역 trusted graph를 거쳐 target까지
+ * 닿는 최단 경로를 "우리가" 발견했는지를 나타낸다(`computeChallengeProgress`).
+ *
+ * `distance`는 그래프 edge 수 그대로다(UX 카피 "N다리" 변환은
+ * `apps/web/lib/distance-copy.ts`가 `/r`과 동일한 규칙으로 담당 — 여기서는
+ * 변환하지 않는다). `searching`일 때는 항상 null이다.
+ *
+ * 경로의 중간 노드는 물론 시작점(start-set 중 실제로 경로를 만든 사람)의
+ * identity도 이 스키마에 없다 — client는 distance 하나만으로 "우리 ─ ○ ─
+ * ○ ─ ○ ─ {target}" 형태를 그린다(익명 원의 개수 = distance - 1). 이 원칙은
+ * `/r`의 `referralResultSchema.path`(뷰어의 direct 상대는 실명 공개)보다
+ * 보수적이다 — 챌린지 결과는 특정 뷰어 한 명이 아니라 불특정 다수가 보는
+ * 공개 공유 surface이기 때문이다.
+ */
+export const challengeProgressSchema = z.object({
+  status: z.enum(["searching", "found"]),
+  distance: z.number().int().nonnegative().nullable(),
+});
+export type ChallengeProgress = z.infer<typeof challengeProgressSchema>;
+
+/**
+ * 2026-09-15 "마지막 연결자 공개" 결정 — target 바로 직전(1홉) participant
+ * 중, minimum distance를 달성하는 shortest path에 실제로 쓰인 사람 전부를
+ * 가리킨다("마지막 연결자"). 중간 노드(2홉 이상)의 identity는 여전히
+ * 절대 공개하지 않는다 — 이 원칙은 바뀌지 않는다. 마지막 연결자도
+ * "공개 동의(`participants.publicConnectorNameConsentAt`)가 있는 사람의
+ * displayName만" 노출한다 — 동의하지 않은 사람은 이름도 id도 이 스키마에
+ * 담기지 않는다.
+ *
+ * - `lastConnectorCount`: 실제 distinct 마지막 연결자 수. 동의 여부와
+ *   무관하다 — 닉네임 공개 여부가 챌린지 결과 자체를 바꾸지 않는다.
+ * - `consentedLastConnectorCount`: 그중 공개에 동의한 사람 수(표시 여부와
+ *   무관, `visibleLastConnectorNames`보다 많을 수 있다).
+ * - `visibleLastConnectorNames`: 동의한 사람의 displayName, 최대 3명까지만
+ *   (390px 화면에서 읽기 좋은 상한, `apps/web/lib/graph-service.ts`의
+ *   `MAX_VISIBLE_LAST_CONNECTORS`). 클라이언트는 이 세 숫자/배열만으로
+ *   "민지 · 수연 · 지훈 외 공개 3명 · 익명 2명" 같은 문구를 조립한다
+ *   (`apps/web/lib/last-connector-copy.ts`) — participantId나 비공개
+ *   displayName은 이 스키마 어디에도 없다.
+ */
+export const challengePublicResultSchema = challengeProgressSchema.extend({
+  lastConnectorCount: z.number().int().nonnegative(),
+  consentedLastConnectorCount: z.number().int().nonnegative(),
+  visibleLastConnectorNames: z.array(z.string()),
+});
+export type ChallengePublicResult = z.infer<typeof challengePublicResultSchema>;
+
+/**
+ * `GET /api/challenges/{token}` 응답 — 로그인 전에도 조회 가능하다(공유
+ * 링크를 로그인 전에 먼저 열 수 있어야 하므로). 대상의 Instagram 해시나
+ * 만든 사람의 신원은 절대 포함하지 않는다. 2026-09-15 결정으로
+ * `challengePublicResultSchema`(status/distance + 마지막 연결자 요약)를
+ * 병합했다 — `/t/{token}` 랜딩 화면이 대상 이름과 진행 상황, 마지막
+ * 연결자 요약을 한 번의 조회로 모두 그릴 수 있어야 하기 때문이다.
+ */
+export const challengePublicInfoSchema = z.object({
+  displayName: z.string(),
+}).merge(challengePublicResultSchema);
+export type ChallengePublicInfo = z.infer<typeof challengePublicInfoSchema>;
+
+/**
+ * `POST /api/challenges/{token}/join` 응답 — 참여 직후 갱신된 진행 상황을
+ * 바로 돌려준다(클라이언트가 별도로 `GET /api/challenges/{token}`을 다시
+ * 부를 필요 없이 화면을 바로 갱신할 수 있게). 스키마는
+ * `challengeProgressSchema`와 동일하다.
+ */
+export const joinChallengeResponseSchema = challengeProgressSchema;
+export type JoinChallengeResponse = ChallengeProgress;
+
+/**
  * `POST /api/links` 응답 — 재사용 가능한 지인 링크. 소유자 신원은 포함하지
  * 않는다(v2 명세 §3.2).
  */

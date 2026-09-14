@@ -1,8 +1,16 @@
 import type { AdjacencyList } from "@gai-ara/graph";
 import { bfsDistances, buildGraph, buildLocalSubgraph, shortestPathNodes, distanceCountsFrom } from "@gai-ara/graph";
-import type { MeNetwork, MeNetworkNode, MeResult, ReferralPathNode } from "@gai-ara/shared";
-import { getAllEdges, getDisplayName, getRecoveryToken } from "./participants";
+import type { ChallengePublicResult, ChallengeProgress, MeNetwork, MeNetworkNode, MeResult, ReferralPathNode } from "@gai-ara/shared";
+import {
+  getAllEdges,
+  getConsentedDisplayNames,
+  getDisplayName,
+  getParticipantIdByInstagramHash,
+  getParticipantIdsFollowingInstagramHash,
+  getRecoveryToken,
+} from "./participants";
 import { getDiscoveredReferralOwners, getRevealedReferralVisitors } from "./referral-links";
+import { getChallengeParticipantIds } from "./challenges";
 import { hashParticipantId } from "./opaque-id";
 
 /**
@@ -219,4 +227,224 @@ export async function computeReferralResult(
   );
 
   return { status: "connected", distance: pathIds.length - 1, path };
+}
+
+interface ChallengeReachability {
+  status: "searching" | "found";
+  distance: number | null;
+  /**
+   * target 바로 직전(1홉)에 있으면서, start-set 중 최소거리를 달성하는
+   * shortest path 중 적어도 하나에 실제로 쓰인 participant 전부(중복
+   * 없음). 한 명을 임의로 고르지 않는다 — 동일한 minimum distance를
+   * 만드는 서로 다른 마지막 연결자가 여럿이면 전부 담는다. **이 배열은
+   * 순수 내부용이다** — participantId를 그대로 담고 있으므로 API 응답으로
+   * 절대 내보내지 않는다(`computeChallengePublicResult`가 동의 필터링을
+   * 거쳐 이름/개수만 뽑아낸다).
+   */
+  lastConnectorParticipantIds: string[];
+}
+
+const NO_REACHABILITY: ChallengeReachability = { status: "searching", distance: null, lastConnectorParticipantIds: [] };
+
+/**
+ * target 쪽에서 이미 계산해둔 `distances`(BFS from target)를 이용해
+ * "target에 인접(distFromTarget===1)하면서, start-set 중 minDistance를
+ * 달성하는 어떤 shortest path에든 실제로 포함되는" participant 전부를
+ * 구한다. 무방향 그래프의 BFS-DAG 성질을 이용한다: minDistance 레벨에
+ * 있는 frontier(그 거리를 달성한 start-set 멤버들)에서 시작해서, 레벨을
+ * 하나씩 낮추며 "한 레벨 낮은 이웃"으로 역전파한다 — 그 레벨 낮은
+ * 이웃이라면 반드시 frontier까지 이어지는 shortest path 위에 있다는
+ * 뜻이기 때문이다. 이미 계산해둔 `distances`/`graph`만 재사용하고
+ * `packages/graph`에 새 함수를 추가하지 않는다 — O(V+E) 역전파 한 번
+ * 추가될 뿐, 기존 BFS와 같은 자릿수다.
+ */
+function findLastConnectors(
+  graph: AdjacencyList,
+  distances: ReadonlyMap<string, number>,
+  minDistance: number,
+  frontierIds: readonly string[],
+): string[] {
+  if (minDistance <= 0) return [];
+
+  const onShortestPath = new Set<string>(frontierIds);
+  if (minDistance >= 2) {
+    const nodesByLevel = new Map<number, string[]>();
+    for (const [nodeId, distance] of distances) {
+      if (distance < 1 || distance > minDistance) continue;
+      const bucket = nodesByLevel.get(distance);
+      if (bucket) bucket.push(nodeId);
+      else nodesByLevel.set(distance, [nodeId]);
+    }
+
+    for (let level = minDistance; level >= 2; level -= 1) {
+      for (const nodeId of nodesByLevel.get(level) ?? []) {
+        if (!onShortestPath.has(nodeId)) continue;
+        for (const neighbor of graph.get(nodeId) ?? []) {
+          if (distances.get(neighbor) === level - 1) onShortestPath.add(neighbor);
+        }
+      }
+    }
+  }
+
+  return [...onShortestPath].filter((id) => distances.get(id) === 1);
+}
+
+/**
+ * 2026-09-15 협업형 챌린지 결정 — "이 챌린지에 명시적으로 참여한
+ * participant들(start-set)에서 출발해, 가이 알아?에 이미 존재하는 전역
+ * trusted graph(`getAllEdges()` — confirmed acquaintance + Instagram
+ * mutual만, 다른 edge 규칙 추가 없음) 전체를 거쳐 target까지 닿는 최단
+ * 경로를 발견할 수 있는가"를 계산한다. 중간 노드가 이 챌린지에 참여했을
+ * 필요는 없다 — 이미 검증된 관계를 인위적으로 막지 않는다.
+ *
+ * target 쪽에서 BFS를 한 번(또는 external leaf 후보 수만큼) 돌리고
+ * start-set 참여자들의 거리를 조회해서 최솟값을 취한다 — 무방향 그래프라
+ * start-set 각각에서 BFS를 도는 것과 결과가 같지만, target/leaf 후보 수가
+ * 보통 start-set보다 훨씬 적으므로 이 방향이 항상 더 싸다. `packages/graph`에
+ * multi-source BFS를 새로 추가하지 않고 기존 `bfsDistances`(single-source)를
+ * 그대로 재사용한다.
+ *
+ * 결과를 어디에도 캐시하지 않는다 — 매 호출마다 `getAllEdges()`로 최신
+ * 그래프를 다시 읽으므로, 새 participant가 참여하거나 새 trusted edge가
+ * 생기면 바로 다음 호출부터 자동으로 반영된다(더 짧은 경로가 나오면 자동
+ * 갱신, 별도 무효화 로직 불필요).
+ *
+ * 2026-09-15 "마지막 연결자" 결정 — 같은 BFS 결과에서 마지막 연결자
+ * (`lastConnectorParticipantIds`)도 함께 뽑아낸다(`findLastConnectors`).
+ * `computeChallengeProgress`/`computeChallengePublicResult` 둘 다 이
+ * 내부 함수 하나를 공유해서, 그래프를 두 번 읽거나 BFS를 중복으로
+ * 돌리지 않는다.
+ */
+async function computeChallengeReachability(
+  challenge: { id: string; targetInstagramUsernameHash: string },
+  prebuiltGraph?: AdjacencyList,
+): Promise<ChallengeReachability> {
+  const startSet = await getChallengeParticipantIds(challenge.id);
+  if (startSet.length === 0) return NO_REACHABILITY;
+
+  const graph = prebuiltGraph ?? buildGraph(await getAllEdges());
+
+  const minDistanceFrom = (distances: ReadonlyMap<string, number>): number | null => {
+    let best: number | null = null;
+    for (const startId of startSet) {
+      const distance = distances.get(startId);
+      if (distance === undefined) continue;
+      if (best === null || distance < best) best = distance;
+    }
+    return best;
+  };
+
+  const targetParticipantId = await getParticipantIdByInstagramHash(challenge.targetInstagramUsernameHash);
+  if (targetParticipantId) {
+    const distances = bfsDistances(graph, targetParticipantId);
+    const minDistance = minDistanceFrom(distances);
+    if (minDistance === null) return NO_REACHABILITY;
+
+    const frontier = startSet.filter((id) => distances.get(id) === minDistance);
+    const lastConnectorParticipantIds = findLastConnectors(graph, distances, minDistance, frontier);
+    return { status: "found", distance: minDistance, lastConnectorParticipantIds };
+  }
+
+  // target이 아직 participant가 아니다 — 그 target을 자기 Instagram 맞팔
+  // 목록에 올려둔(실제로 서로 팔로우하는) 실제 participant 후보들을 거쳐
+  // +1홉으로 계산한다. 이 leaf candidate 자체는 그래프 노드로 추가되지
+  // 않는다 — `packages/graph`는 이 target의 존재를 전혀 모른다. 마지막
+  // 연결자 = minimum distance를 달성하는 leaf candidate 전부(하나만
+  // 고르지 않는다) — target이 그래프 노드가 아니므로 leaf candidate
+  // 자신이 곧 "target 바로 직전 사람"이다.
+  const leafCandidateIds = await getParticipantIdsFollowingInstagramHash(challenge.targetInstagramUsernameHash);
+  if (leafCandidateIds.length === 0) return NO_REACHABILITY;
+
+  const leafDistances: Array<{ leafId: string; distance: number }> = [];
+  for (const leafId of leafCandidateIds) {
+    const distances = bfsDistances(graph, leafId);
+    const best = minDistanceFrom(distances);
+    if (best !== null) leafDistances.push({ leafId, distance: best + 1 });
+  }
+  if (leafDistances.length === 0) return NO_REACHABILITY;
+
+  const minDistance = Math.min(...leafDistances.map((entry) => entry.distance));
+  const lastConnectorParticipantIds = leafDistances
+    .filter((entry) => entry.distance === minDistance)
+    .map((entry) => entry.leafId);
+  return { status: "found", distance: minDistance, lastConnectorParticipantIds };
+}
+
+/** `POST /api/challenges/{token}/join` 등 진행 상태(status/distance)만 필요한 호출부용. */
+export async function computeChallengeProgress(challenge: {
+  id: string;
+  targetInstagramUsernameHash: string;
+}): Promise<ChallengeProgress> {
+  const { status, distance } = await computeChallengeReachability(challenge);
+  return { status, distance };
+}
+
+/**
+ * 2026-09-15 "홈 공개 챌린지 목록" 결정 — 홈에 보여줄 공개 챌린지 3~5개의
+ * 진행 상황을 한 번에 계산한다. 챌린지마다 `computeChallengeProgress`를
+ * 부르면 전역 edge 조회 + `buildGraph`가 목록 길이만큼 반복되므로, 여기서
+ * **그래프를 딱 한 번만 만들어** 재사용한다. 챌린지별로 남는 비용은 그
+ * 챌린지의 start-set 조회 한 번과 target 기준 BFS 한 번뿐이다(원래 지시
+ * §15 — participant 수만큼 BFS를 도는 구조를 만들지 않는다. 시작점이
+ * 몇 명이든 BFS는 target 쪽에서 한 번만 돈다).
+ *
+ * MVP 규모(공개 챌린지 5개)에서는 요청 시점 계산으로 충분하다 — progress
+ * 캐시나 백그라운드 잡을 추가하지 않는다. 캐시가 없으므로 누군가 연결을
+ * 보태면 다음 홈 방문부터 바로 반영된다.
+ */
+export async function computeChallengeProgressBatch(
+  challenges: ReadonlyArray<{ id: string; targetInstagramUsernameHash: string }>,
+): Promise<ChallengeProgress[]> {
+  if (challenges.length === 0) return [];
+
+  const graph = buildGraph(await getAllEdges());
+  const progresses: ChallengeProgress[] = [];
+  for (const challenge of challenges) {
+    const { status, distance } = await computeChallengeReachability(challenge, graph);
+    progresses.push({ status, distance });
+  }
+  return progresses;
+}
+
+/** 공개 결과에 표시할 수 있는 마지막 연결자 닉네임 상한(390px 기준, 2026-09-15 결정). */
+const MAX_VISIBLE_LAST_CONNECTORS = 3;
+
+/**
+ * `GET /api/challenges/{token}`(공개 조회) 전용 — `computeChallengeProgress`와
+ * 같은 계산을 공유하되, "마지막 연결자" 정보까지 동의 필터링을 거쳐
+ * 안전하게 노출 가능한 형태로 가공한다.
+ *
+ * `lastConnectorCount`는 그래프 계산상 실제 distinct 마지막 연결자
+ * 수이고, 닉네임 공개 동의 여부와 무관하다(동의 안 한 사람도 숫자에는
+ * 포함된다) — 결과 자체가 동의 여부에 따라 달라지면 안 된다는 원칙.
+ * `visibleLastConnectorNames`는 그중 동의한 사람의 displayName만,
+ * 최대 `MAX_VISIBLE_LAST_CONNECTORS`명까지만 담는다 — 2026-09-15
+ * 추가 결정으로 `ChallengePathStrip`(`apps/web/components/ChallengePathStrip.tsx`)이
+ * 이 이름들을 "마지막 연결자 fan-out" 노드에 직접 붙여서 그린다.
+ * `consentedLastConnectorCount`는 (표시 여부와 무관하게) 동의한 사람
+ * 전체 수다 — 지금은 UI가 쓰지 않지만 API 응답에는 남겨둔다.
+ *
+ * participantId, 동의하지 않은 displayName, 전체 shortest path 등은
+ * 이 함수의 반환값에도, 그 어떤 중간 변수에도 남지 않는다 —
+ * `lastConnectorParticipantIds`는 `computeChallengeReachability`
+ * 내부에서만 살아 있고, 여기서 이름 조회에 한 번 쓰인 뒤 버려진다.
+ */
+export async function computeChallengePublicResult(challenge: {
+  id: string;
+  targetInstagramUsernameHash: string;
+}): Promise<ChallengePublicResult> {
+  const { status, distance, lastConnectorParticipantIds } = await computeChallengeReachability(challenge);
+
+  if (status === "searching" || lastConnectorParticipantIds.length === 0) {
+    return { status, distance, lastConnectorCount: 0, consentedLastConnectorCount: 0, visibleLastConnectorNames: [] };
+  }
+
+  const consentedNames = await getConsentedDisplayNames(lastConnectorParticipantIds);
+  return {
+    status,
+    distance,
+    lastConnectorCount: lastConnectorParticipantIds.length,
+    consentedLastConnectorCount: consentedNames.length,
+    visibleLastConnectorNames: consentedNames.slice(0, MAX_VISIBLE_LAST_CONNECTORS),
+  };
 }

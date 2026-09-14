@@ -1,0 +1,1 @@
+ALTER TABLE "target_challenges" ADD COLUMN "is_public" boolean DEFAULT false NOT NULL;

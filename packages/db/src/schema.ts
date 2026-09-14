@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   pgTable,
   text,
@@ -36,16 +37,43 @@ import {
  * 행/Instagram 참여자는 NULL). 직접 연결된 상대의 화면, 본인 화면, 본인이
  * 만든 공개 링크 결과에서만 노출한다 — 검색·임의 조회에는 쓰지 않는다
  * (`AGENTS.md` §1 원칙 3).
+ *
+ * instagramUsernameHash: 2026-09-14 Instagram import 재도입 결정 — 카카오
+ * 로그인이 신원 판별의 유일한 기준이므로(identityHash처럼 매칭에 쓰이지
+ * 않는다), 본인이 "이게 내 인스타 계정이에요"라고 직접 확인한 username의
+ * 해시만 여기 별도로 저장한다. `follows.followee_identity_hash`가 이
+ * 컬럼과 대조돼야 맞팔 상대가 실제 참여자인지 알 수 있다(§ `follows` 참고).
+ * NULL 허용(대부분은 인스타 연동을 안 함) — Postgres는 유니크 인덱스에서
+ * NULL끼리는 서로 충돌시키지 않으므로 여러 명이 NULL이어도 문제없다.
+ *
+ * publicConnectorNameConsentAt: 2026-09-15 "마지막 연결자 공개" 결정 —
+ * 이 참여자가 어느 챌린지의 "target 바로 직전 연결자"로 계산됐을 때,
+ * 그 displayName을 공개 챌린지 결과에 실어도 되는지의 동의 시각이다.
+ * NULL이면 절대 공개하지 않는다(기본값이자 안전한 쪽). `setDisplayName`
+ * (apps/web/lib/participants.ts)이 **표시 이름을 최초로 설정하는 순간에만**
+ * 함께 채운다 — 화면 02(로그인 뒤 이름 입력)가 "길의 마지막 연결자가
+ * 되면 이 이름이 챌린지에 표시될 수 있어요"라는 고지를 보여준 다음에
+ * 제출을 받는 흐름이기 때문에, 그 제출 자체가 동의다. 이미 displayName이
+ * 있는 상태에서 이 값을 다시 호출해도(현재 UI에는 그런 경로가 없지만)
+ * 이 컬럼은 건드리지 않는다 — 그 사용자가 이 고지를 실제로 봤다는 보장이
+ * 없기 때문이다. 이 기능 도입 전에 이미 표시 이름을 설정한 기존
+ * 참여자는 이 고지를 본 적이 없으므로 이 값이 계속 NULL로 남고, 소급
+ * 공개되지 않는다.
  */
 export const participants = pgTable("participants", {
   id: uuid("id").defaultRandom().primaryKey(),
   identityHash: text("identity_hash").notNull(),
   recoveryToken: text("recovery_token").notNull(),
   displayName: text("display_name"),
+  instagramUsernameHash: text("instagram_username_hash"),
+  publicConnectorNameConsentAt: timestamp("public_connector_name_consent_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   identityHashUnique: uniqueIndex("participants_identity_hash_key").on(table.identityHash),
   recoveryTokenUnique: uniqueIndex("participants_recovery_token_key").on(table.recoveryToken),
+  instagramUsernameHashUnique: uniqueIndex("participants_instagram_username_hash_key").on(
+    table.instagramUsernameHash,
+  ),
 }));
 
 /**
@@ -82,12 +110,19 @@ export const sessions = pgTable("sessions", {
 });
 
 /**
- * 참여자 한 명이 자기 following.json에서 신고한 "나는 이 사람을 팔로우한다"는
- * 방향성 있는 주장. 이것만으로는 맞팔(mutual)이 아니다 — followee 쪽도
- * 참여해서 반대 방향 행을 올려야, 그 둘을 대조해서 mutual edge로 인정한다
- * (§4 참고). followeeIdentityHash는 FK가 아니다 — 아직 참여하지 않은
- * 사람의 해시를 미리 담아둘 수 있어야, 그 사람이 나중에 참여했을 때
- * 곧바로 대조가 가능하다.
+ * 2026-09-14 Instagram import 재도입 — 이름은 과거(participant-only 모델
+ * 시절) "내가 팔로우하는 사람" 원본 그대로지만, 지금은 의미가 다르다:
+ * 한 참여자가 자기 Instagram export에서 계산한 "맞팔(followers ∩
+ * following)" 상대 하나당 한 행이다(`packages/ig-parser`의
+ * `computeMutuals` 참고) — 팔로잉 전체가 아니라 이미 교집합까지 끝난
+ * 결과만 저장한다. followeeIdentityHash는 FK가 아니라 그 상대 Instagram
+ * username의 해시다(`participants.identityHash`가 아니라
+ * `participants.instagramUsernameHash`와 대조한다) — 아직 그 사람이
+ * 가입 전이거나 자기 인스타 계정을 연동하기 전이어도 해시를 미리 담아둘
+ * 수 있어야, 나중에 연동했을 때 곧바로 대조가 가능하다. 재업로드 시
+ * 이 참여자의 행을 전부 지우고 새 맞팔 목록으로 다시 채운다(source별
+ * 독립적 동기화 — `acquaintance_confirmations`의 확정 관계는 건드리지
+ * 않는다).
  */
 export const follows = pgTable("follows", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -101,6 +136,12 @@ export const follows = pgTable("follows", {
     table.followerParticipantId,
     table.followeeIdentityHash,
   ),
+  // `follows_pair_key`는 (follower_participant_id, followee_identity_hash) 복합키라
+  // 선행 컬럼이 follower_participant_id다 — "이 해시를 맞팔로 등록한 사람이
+  // 누구든" 찾는 조회(타겟 챌린지 Path Check, `getParticipantIdsFollowingInstagramHash`)는
+  // followeeIdentityHash만 갖고 시작하므로 이 복합 인덱스를 효율적으로 타지
+  // 못한다. 단일 컬럼 인덱스를 별도로 둔다(2026-09-14, `01_DB_SCHEMA.md` §4.8).
+  followeeHashIdx: index("follows_followee_identity_hash_idx").on(table.followeeIdentityHash),
 }));
 
 export const pairInviteStatus = ["pending", "accepted", "expired"] as const;
@@ -270,5 +311,96 @@ export const acquaintanceConfirmations = pgTable("acquaintance_confirmations", {
   linkConfirmerUnique: uniqueIndex("acquaintance_confirmations_link_confirmer_key").on(
     table.linkId,
     table.confirmerParticipantId,
+  ),
+}));
+
+/**
+ * 2026-09-14 "타겟 챌린지" 기능 — 일반 참여자가 궁금한 대상(꼭 참여자가
+ * 아니어도 됨, 예: 연예인) 하나를 지정해 "이 사람까지 몇 다리인지 같이
+ * 확인해보자"는 공유 가능한 챌린지를 만든다. 운영자가 미리 대상을
+ * 등록하는 방식이 아니라, 참여자가 직접 만든다 — 유명인 사전 DB가
+ * 아니다.
+ *
+ * displayName은 만든 사람이 챌린지 화면에 보여주려고 직접 입력한 이름일
+ * 뿐, 공식적으로 검증된 인물명이 아니다(예: 오타·별명이어도 그대로 씀).
+ * targetInstagramUsernameHash는 `hashInstagramUsername()`으로 만든 해시만
+ * 저장한다 — 원본 username은 절대 저장하지 않는다(`AGENTS.md` §1 원칙 2).
+ * 대상이 실제 참여자라면 `participants.instagramUsernameHash`와 대조해서
+ * 찾고, 아직 참여자가 아니면(`follows.followeeIdentityHash`로 이 해시를
+ * 맞팔로 등록해둔 실제 참여자들을 거쳐) 그 참여자까지의 거리 + 1로
+ * 계산한다(`apps/web/lib/graph-service.ts`의 `computeChallengeProgress`
+ * 참고) — 이때도 external 대상 자체는 그래프에 노드로 저장하지 않는다.
+ *
+ * targetInstagramUsernameHash는 UNIQUE다(2026-09-15 결정) — 같은 target에
+ * 대한 챌린지가 여러 개로 쪼개지지 않고 하나로 합쳐지도록, "동일 target =
+ * 동일 challenge"를 DB 제약으로 강제한다. 중복 판정은 displayName이 아니라
+ * 이 해시(= normalize된 Instagram username)로만 한다 — "부승관"과 "승관"이
+ * 같은 계정을 가리키면 같은 challenge로 합쳐지고, displayName은 최초
+ * 생성 시점 값을 그대로 유지한다(`apps/web/lib/challenges.ts`의
+ * `createChallenge` 참고, 새 입력값으로 덮어쓰지 않는다).
+ */
+export const targetChallenges = pgTable("target_challenges", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  token: text("token").notNull(),
+  displayName: text("display_name").notNull(),
+  targetInstagramUsernameHash: text("target_instagram_username_hash").notNull(),
+  creatorParticipantId: uuid("creator_participant_id")
+    .notNull()
+    .references(() => participants.id, { onDelete: "cascade" }),
+  /**
+   * 2026-09-15 "홈 공개 챌린지 목록" 결정 — 홈(화면 01)에 노출해도 되는
+   * 챌린지인지 여부. **기본값은 false이고, 사용자용 공개/비공개 설정 UI는
+   * 만들지 않는다** — 운영자가 유명인/크리에이터처럼 공개해도 되는 대상만
+   * 직접 SQL로 켠다. 사용자가 만든 챌린지가 자동으로 공개 디렉터리에
+   * 올라가는 경로를 코드/스키마 어디에도 두지 않기 위한 설계다
+   * (`AGENTS.md` §1 원칙 3 — 사람을 찾아내는 디렉터리는 금지, 일반인
+   * 대상 챌린지는 토큰을 아는 사람만 열 수 있어야 한다).
+   *
+   * 공개 대상이 소수(홈에 3~5개)라 별도 인덱스를 두지 않는다 — 전체
+   * 챌린지 수가 인덱스가 필요한 규모가 되면 그때 partial index를 추가한다.
+   */
+  isPublic: boolean("is_public").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  tokenUnique: uniqueIndex("target_challenges_token_key").on(table.token),
+  targetHashUnique: uniqueIndex("target_challenges_target_hash_key").on(table.targetInstagramUsernameHash),
+}));
+
+/**
+ * 2026-09-15 "협업형 챌린지" 모델 — 챌린지의 그래프 탐색 시작점(start-set)
+ * 멤버십만 기록하는 순수 join table이다. `/t/{token}`을 열어본 것만으로는
+ * (page view) 여기 행이 생기지 않는다 — "나도 연결 보태기" 버튼을 눌러
+ * 명시적으로 참여했을 때만(`joinChallenge`) upsert된다.
+ *
+ * 이 테이블에 들어간다고 새 edge가 생기는 게 아니다 — "이 참여자가 이미
+ * 갖고 있는 confirmed acquaintance/Instagram mutual 관계 전체를 이
+ * 챌린지의 시작점으로 써도 된다"는 의미의 멤버십 표시일 뿐이다. 실제
+ * traversal은 여전히 `getAllEdges()`가 반환하는 전역 trusted graph를
+ * 그대로 쓴다 — 중간 노드가 같은 챌린지에 참여했을 필요는 없다.
+ *
+ * 챌린지 생성자는 `createChallenge` 트랜잭션 안에서 자동으로 첫
+ * participant로 upsert된다(2026-09-15 결정) — 만든 사람이 자기 네트워크를
+ * 시작점으로 쓰지 않는 게 오히려 어색하기 때문이다.
+ *
+ * soft-delete/탈퇴 컬럼을 두지 않는다 — `acquaintance_confirmations`와
+ * 같은 이유로, MVP에서는 탈퇴 기능 자체를 제공하지 않는다.
+ */
+export const challengeParticipants = pgTable("challenge_participants", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  challengeId: uuid("challenge_id")
+    .notNull()
+    .references(() => targetChallenges.id, { onDelete: "cascade" }),
+  participantId: uuid("participant_id")
+    .notNull()
+    .references(() => participants.id, { onDelete: "cascade" }),
+  joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  // 선행 컬럼이 challengeId라 "이 챌린지의 start-set 전체 조회"(챌린지
+  // progress 계산이 매 요청마다 필요로 하는 바로 그 조회)가 이 유니크
+  // 인덱스를 그대로 탄다 — `follows`처럼 별도 단일 컬럼 인덱스를 추가할
+  // 필요가 없다.
+  challengeParticipantUnique: uniqueIndex("challenge_participants_challenge_participant_key").on(
+    table.challengeId,
+    table.participantId,
   ),
 }));

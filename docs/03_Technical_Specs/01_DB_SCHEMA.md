@@ -1,6 +1,6 @@
 # DB Schema & Identity/Graph Design
 > Created: 2026-09-10 22:30
-> Last Updated: 2026-09-13
+> Last Updated: 2026-09-14
 
 **DB 엔진**: PostgreSQL. Turso(libSQL)로 바꾸는 걸 검토했다가, 이 워크로드가
 SQLite 계열의 장점을 살릴 수 없고 마이그레이션 비용 대비 얻는 게 없어 다시
@@ -12,12 +12,20 @@ PostgreSQL 타입으로 표기한다.
 이 문서는 두 가지 핵심 결정을 다룬다: (1) Instagram username을 서버에서 어떻게
 식별/매칭할지, (2) 참여자 사이의 관계(edge)를 어떤 데이터 구조로 저장할지. 두
 결정은 서로 얽혀 있으므로(식별자가 곧 그래프 노드 키) 하나의 문서로 다룬다.
-2026-09-13부터 (2)의 1차 소스는 mutual-follow가 아니라 지인 확인 링크다(§4).
+2026-09-13에 (2)의 1차 소스가 mutual-follow에서 지인 확인 링크로 바뀌었다가,
+2026-09-14 결정으로 Instagram 맞팔(followers ∩ following)이 두 번째 활성
+edge 소스로 다시 합류했다 — 지금은 두 source를 함께 쓴다(§4).
 **TASK-003(v2, 구현 완료) 갱신**: 지인 확인 링크가 1회용 `pair_invites`에서
 재사용 가능한 `acquaintance_links`/`acquaintance_confirmations`로 바뀌었고,
 카카오 로그인(`oauth_accounts`)과 사용자 표시 이름(`participants.display_name`)이
 추가됐다. 상세 설계 근거는 [03_INVITE_GRAPH_V2_SPEC.md](./03_INVITE_GRAPH_V2_SPEC.md)
-참고.
+참고. **2026-09-14 갱신**: 이 문서 전체를 실제 스키마(`packages/db/src/schema.ts`)와
+코드(`apps/web/lib/participants.ts`)에 맞춰 다시 검증했다 — 아래 §1·§4는
+그동안 2026-09-13 이전 모델(일방향 following 신고 + 자기조인 mutual 판정,
+`/api/upload`·`/api/invites`·`/pair/[token]` 라우트가 "비활성이지만 그대로
+동작") 기준으로 서술돼 있었는데, 실제로는 해당 API 라우트/페이지 자체가
+코드베이스에서 삭제됐고(스키마·조회 함수 하나만 코드에 남음), `follows`의
+의미도 완전히 바뀌었다(§4.2).
 
 ## 1. 엔티티 개요
 
@@ -29,31 +37,37 @@ participants (1) ──< pair_invites (inviter) >── pair_invites (recipient)
 pair_invites (1) ── pair_results (1)                      -- 비활성 보존
 participants (1) ──< acquaintance_links (owner)
 acquaintance_links (1) ──< acquaintance_confirmations >── (1) participants (confirmer)
+participants (1) ──< target_challenges (creator)          -- 2026-09-14 신규, §4.9
 ```
 
-- `participants`: 그래프의 노드. **오직 실제로 자기 데이터를 업로드했거나
-  최소 부트스트랩/카카오 로그인으로 참여를 확정한 사람만** 담는다 —
-  "고스트" 노드는 없다(participant-only 그래프, §4 참고). Instagram username
-  기반(`upsertParticipant`), Instagram 없는 최소 부트스트랩
-  (`createBootstrapParticipant`), 카카오 로그인(`findOrCreateKakaoParticipant`,
-  이상 모두 `apps/web/lib/participants.ts`) 세 경로가 같은 테이블에 행을
-  만든다. `display_name`은 TASK-003(v2)부터 추가된 nullable 컬럼으로,
-  사용자가 화면 02에서 직접 입력한 값만 담는다 — 로그인 프로필에서 자동으로
-  채우지 않는다(§4.6).
+- `participants`: 그래프의 노드. **오직 최소 부트스트랩(지인 링크만으로
+  참여) 또는 카카오 로그인으로 참여를 확정한 사람만** 담는다 — "고스트"
+  노드는 없다(participant-only 그래프, §4 참고). Instagram 없는 최소
+  부트스트랩(`createBootstrapParticipant`)과 카카오 로그인
+  (`findOrCreateKakaoParticipant`, 둘 다 `apps/web/lib/participants.ts`) 두
+  경로만 참여자 행을 만든다 — Instagram username은 더 이상 참여자 생성
+  수단이 아니다(`upsertParticipant`는 코드에 남아 있지만 현재 어디서도
+  호출되지 않는 사문화된 함수다). `display_name`은 TASK-003(v2)부터 추가된
+  nullable 컬럼으로, 사용자가 화면 02에서 직접 입력한 값만 담는다 —
+  로그인 프로필에서 자동으로 채우지 않는다(§4.6).
 - `oauth_accounts`: TASK-003(v2) 신규. 카카오 `(provider, providerAccountId)`로
   동일 사용자를 판별해 `participants`에 연결한다(§4.6).
-- `follows`: 한 참여자가 "나는 이 사람을 팔로우한다"고 신고한 방향성 있는 주장.
-  이것만으로는 그래프에 edge가 생기지 않는다 — 상대도 참여해서 반대 방향을
-  신고해야 mutual로 확정된다(§4.2 소스 2, 후순위 유지).
+- `follows`: 한 참여자가 자기 Instagram export에서 브라우저로 계산한
+  맞팔(followers ∩ following) 상대 한 명당 한 행(2026-09-14 재도입 — 의미가
+  바뀌었다, §4.2). 상대도 실제 참여자이고 자기 계정을 연동했을 때만
+  edge로 인정된다.
 - `sessions`: 로그인 없이 "내 결과 다시 보기"를 지원하기 위한 최소 세션 —
   카카오 로그인도 이 테이블의 httpOnly 쿠키 세션을 그대로 재사용한다(Auth.js
   자체 세션은 OAuth 핸드셰이크 동안만 쓰이고 저장되지 않는다, §4.6).
-- `pair_invites` / `pair_results`: TASK-002가 도입한 1회용 "우리 몇다리?"
-  consent 플로우의 상태 저장소([02_API_SPECS.md §3](./02_API_SPECS.md#3-초대consent-플로우)).
-  TASK-003(v2) 이후 **비활성 보존**(§4.7) — `getAllEdges()`가 더 이상 이
-  테이블을 조회하지 않는다.
+- `pair_invites` / `pair_results`: TASK-002가 도입했던 1회용 "우리 몇다리?"
+  consent 플로우의 상태 저장소였다. TASK-003(v2) 이후 `getAllEdges()`가
+  더 이상 이 테이블을 조회하지 않을 뿐 아니라, 이 플로우가 쓰던 API 라우트
+  (`/api/upload`, `/api/invites`, `/api/invites/{token}/accept`,
+  `/api/pairs/{token}/result`)와 UI(`/pair/[token]`, `LivePairPage.tsx`)
+  자체가 코드베이스에서 삭제됐다 — 지금은 테이블 스키마와
+  `getLegacyPairInviteEdges()` 조회 함수(호출하는 곳 없음)만 남아 있다(§4.7).
 - `acquaintance_links` / `acquaintance_confirmations`: TASK-003(v2) 신규,
-  지금 유일한 edge 소스(§4.2). 재사용 가능한 지인 링크와 그 확인 기록이다.
+  edge 소스 중 하나(§4.2). 재사용 가능한 지인 링크와 그 확인 기록이다.
 
 ## 2. 테이블 정의
 
@@ -63,6 +77,9 @@ participants
   identity_hash       text UNIQUE NOT NULL       -- §3 참고, 평문 username 아님
   recovery_token      text UNIQUE NOT NULL
   display_name        text                       -- nullable, TASK-003(v2) 신규. §4.6 참고
+  instagram_username_hash          text          -- nullable, UNIQUE. 2026-09-14 신규. §4.2 참고
+  public_connector_name_consent_at timestamptz   -- nullable. 2026-09-15 신규 "마지막 연결자 공개" 동의 시각.
+                                                  -- display_name을 최초로 설정할 때만 채워진다(§4.9 참고).
   created_at          timestamptz NOT NULL default now()
 
 oauth_accounts        -- TASK-003(v2) 신규
@@ -175,8 +192,11 @@ normalize(username) = username.trim().replace(/^@/, "").toLowerCase()
   기술적으로 역산이 가능하다"는 점을 명시하고, PEPPER 접근 권한을 최소화한다
   (비밀 관리 서비스, 로그 미노출, 접근 감사).
 - **오용 방지**: D 방식 자체는 안전해도, "임의 username을 넣으면 해시나 매칭
-  존재 여부를 알려주는" API가 있으면 사실상 검색 기능이 부활한다. 이 문제는 API
-  설계로 막는다 — [02_API_SPECS.md §1](./02_API_SPECS.md#1-서버가-절대-받지-않는-것)
+  존재 여부를 알려주는" API가 있으면 사실상 검색 기능이 부활한다. 이 문제는
+  원칙적으로 API 설계로 막는다 — [02_API_SPECS.md §1](./02_API_SPECS.md#1-서버가-절대-받지-않는-것)
+  참고. 2026-09-14 결정으로 이 원칙에 좁은 예외 하나(Path Check)가 추가됐다
+  — 대상이 존재하는지 자체는 응답에서 구분하지 않는 방식으로 원칙의 취지를
+  지킨다. 상세는 [02_API_SPECS.md §8](./02_API_SPECS.md#8-path-check--username을-정확히-아는-경우에만-거리-확인-설계-확정-미구현)
   참고.
 
 ### 3.4 검토했지만 지금은 채택하지 않는 옵션: PSI
@@ -227,14 +247,24 @@ Instagram 아이디를 폼에 직접 입력한다. 트레이드오프로 오타 
   `direct === 0`일 때 "친구를 초대하면 첫 연결이 생겨요" 안내를 보여줘서, 빈
   상태를 초대 유도로 전환한다.
 
-## 4. 그래프 저장 구조 (지인 확인 기반 edge — Instagram 맞팔·1회용 링크는 비활성 보존)
+**2026-09-14 갱신**: 위 "followers는 아예 수집하지 않고"는 2026-09-12 시점
+서술이다. 지금은 맞팔(교집합)을 계산하려면 followers도 필요해서 브라우저가
+둘 다 읽는다 — 다만 서버로 전송하는 건 여전히 교집합 결과뿐이고
+(followers/following 원본은 여전히 서버로 오지 않는다), "고스트 노드가
+없다"는 이 절의 핵심 결론과 participant-only 원칙은 그대로 유지된다(§4.2).
 
-> **TASK-003(v2, 구현 완료) 갱신**: 지금 유일한 edge 소스는
-> `acquaintance_confirmations`다(§4.2). TASK-002가 유일한 소스로 썼던
-> `pair_invites`는 이번 라운드부터 `follows`와 같은 취급(코드/스키마 보존,
-> `getAllEdges()`는 조회 안 함)을 받는다(§4.7). 카카오 로그인·표시 이름
-> 저장 구조는 §4.6 참고. 설계 근거 전체는
-> [03_INVITE_GRAPH_V2_SPEC.md](./03_INVITE_GRAPH_V2_SPEC.md) 참고.
+## 4. 그래프 저장 구조 (지인 확인 + Instagram 맞팔 — 1회용 링크만 비활성)
+
+> **TASK-003(v2) → 2026-09-14 갱신**: 활성 edge 소스는 두 개다 —
+> `acquaintance_confirmations`(지인 링크 확인)와 `follows`(Instagram 맞팔,
+> 상대도 참여자로 확인된 경우만, §4.2). 2026-09-13에는 `follows`가 비활성
+> 보존 상태였지만, 2026-09-14 결정으로 다시 활성화됐다 — 두 source는 신뢰
+> 수준 구분 없이 `UNION`으로 합쳐진다. TASK-002가 유일한 소스로 썼던
+> `pair_invites`만 여전히 비활성(코드/스키마 보존, `getAllEdges()`는 조회
+> 안 함, §4.7). 카카오 로그인·표시 이름 저장 구조는 §4.6 참고. 설계 근거
+> 전체는 [03_INVITE_GRAPH_V2_SPEC.md](./03_INVITE_GRAPH_V2_SPEC.md)와
+> [00_PRODUCT_DECISION_LOG.md](../01_Concept_Design/00_PRODUCT_DECISION_LOG.md)의
+> 2026-09-13·2026-09-14 항목 참고.
 
 ### 4.1 검토한 옵션
 
@@ -243,14 +273,14 @@ Instagram 아이디를 폼에 직접 입력한다. 트레이드오프로 오타 
 | A | 전용 그래프 DB (Neo4j, Dgraph 등) | 다중 홉 순회에 최적화 | 별도 스테이트풀 시스템 운영 부담(백업/모니터링 이중화), MVP 규모에서 이점을 체감하기 어려움 |
 | B | PostgreSQL 관계형 테이블 + 요청 시 인메모리 BFS | 데이터스토어 단일화, 이미 검증된 드라이버/툴링(§00_DEVELOPMENT_PRINCIPLES §1.3) | 그래프가 매우 커지면(수백만 edge) 매 요청 전체 스캔이 느려짐 |
 
-### 4.2 채택안: B (PostgreSQL + 요청 시 인메모리 BFS), 유일한 활성 소스는 `acquaintance_confirmations`
+### 4.2 채택안: B (PostgreSQL + 요청 시 인메모리 BFS), 활성 소스는 두 개
 
-**모델(TASK-003(v2) 확정)**: `getAllEdges()`(`apps/web/lib/participants.ts`)가
-매 요청마다 `acquaintance_confirmations`를 `acquaintance_links`와 조인해 edge
-목록을 만든다. 새 edge 전용 테이블을 따로 두지 않는 원칙은 그대로 유지한다 —
-확인 기록 테이블의 행 자체가 edge다.
+**모델(2026-09-14 확정)**: `getAllEdges()`(`apps/web/lib/participants.ts`)가
+매 요청마다 두 source를 `UNION`으로 합쳐 edge 목록을 만든다. 새 edge 전용
+테이블을 따로 두지 않는 원칙은 그대로 유지한다 — 확인 기록/맞팔 기록
+테이블의 행 자체가 edge다.
 
-**활성 소스 — 재사용 지인 링크 확인(`acquaintance_confirmations`)**:
+**소스 1 — 재사용 지인 링크 확인(`acquaintance_confirmations`)**:
 수신자가 화면 04 "{표시 이름}님을 알고 있나요?"에서 "네, 알고 있어요"를 눌러
 `POST /api/links/{token}/confirm`을 호출하면(`confirmAcquaintanceLink`,
 `apps/web/lib/acquaintance-links.ts`), 그 링크의 `owner_participant_id`와
@@ -260,18 +290,67 @@ Instagram 아이디를 폼에 직접 입력한다. 트레이드오프로 오타 
 링크를 두 번 확인해도(멱등) 성공 처리되고 edge가 중복 생기지 않는다(UNIQUE
 제약).
 
+**소스 2 — Instagram 맞팔(`follows`, 2026-09-14 재도입)**: TASK-002 시절과
+데이터 모델 자체가 다르다 — 더 이상 "일방향 following 신고 두 개를
+자기조인해 mutual을 판정"하지 않는다. 각 참여자가 자기 Instagram export를
+**브라우저에서** 열어 `followers ∩ following`(맞팔)까지 미리 계산하고
+(`packages/ig-parser`의 `computeMutuals`), 그 결과 username들만 해싱해
+서버로 보낸다(`POST /api/instagram-import`, [02_API_SPECS.md §2.3](./02_API_SPECS.md#23-클라이언트--서버-데이터-계약-2026-09-14-갱신)).
+서버는 이걸 그대로 `follows`에 "이 참여자 → 맞팔 상대 해시" 행으로
+저장한다 — `follows` 한 행 자체가 이미 "맞팔"이라는 뜻이고, 반대 방향
+행을 따로 찾아 대조할 필요가 없다. 대신 **상대가 실제 참여자이고 자기
+Instagram 계정도 연동했는지**를 확인해야 edge로 인정된다 —
+`participants.instagram_username_hash`와 일치할 때만이다.
+
 ```sql
 SELECT DISTINCT
-  LEAST(al.owner_participant_id, ac.confirmer_participant_id) AS a,
-  GREATEST(al.owner_participant_id, ac.confirmer_participant_id) AS b
-FROM acquaintance_confirmations ac
-JOIN acquaintance_links al ON al.id = ac.link_id
+  LEAST(f.follower_participant_id, p.id) AS a,
+  GREATEST(f.follower_participant_id, p.id) AS b
+FROM follows f
+JOIN participants p ON p.instagram_username_hash = f.followee_identity_hash
+WHERE p.id != f.follower_participant_id
 ```
 
+`follows` 쪽만 확인하면 충분하다 — 맞팔은 한쪽 export만으로도 이미 양방향
+사실이므로, 상대가 반대 방향 행을 올릴 때까지 기다릴 필요가 없다(TASK-002
+시절 self-join 모델과 다른 점). 상대가 아직 Instagram 계정을 연동하지
+않았다면(해시가 어떤 참여자와도 안 맞으면) edge가 생기지 않고, 나중에
+연동하면 다음 `getAllEdges()` 호출부터 자동으로 나타난다 — 별도
+백필/마이그레이션이 필요 없다. 매칭되지 않은 해시 행은 `follows`에 그대로
+남아 있고, Path Check(§8, `02_API_SPECS.md`)가 조회하는 대상이 바로 이
+행들이다.
+
+**두 소스를 합치는 실제 쿼리** (`getAllEdges()`):
+
+```sql
+SELECT DISTINCT a, b FROM (
+  SELECT
+    LEAST(al.owner_participant_id, ac.confirmer_participant_id) AS a,
+    GREATEST(al.owner_participant_id, ac.confirmer_participant_id) AS b
+  FROM acquaintance_confirmations ac
+  JOIN acquaintance_links al ON al.id = ac.link_id
+  UNION
+  SELECT
+    LEAST(f.follower_participant_id, p.id) AS a,
+    GREATEST(f.follower_participant_id, p.id) AS b
+  FROM follows f
+  JOIN participants p ON p.instagram_username_hash = f.followee_identity_hash
+  WHERE p.id != f.follower_participant_id
+) edges
+```
+
+두 source 사이에 신뢰 수준 구분을 두지 않는다 — 어느 쪽에서 왔는지는 이
+쿼리를 호출하는 BFS(`packages/graph`)가 전혀 알지 못한다(2026-09-13
+재검토 조건의 "섞지 않는다" 조항은 2026-09-14 결정으로 폐기됐다 — 근거는
+[00_PRODUCT_DECISION_LOG.md](../01_Concept_Design/00_PRODUCT_DECISION_LOG.md)
+2026-09-14 항목).
+
 **비활성 보존 — 1회용 지인 링크(`pair_invites`)**: TASK-002가 유일한 소스로
-썼던 쿼리다. 코드(`getLegacyPairInviteEdges`, `apps/web/lib/participants.ts`)와
-스키마 모두 삭제하지 않았지만, `getAllEdges()`는 더 이상 이 쿼리를 실행하지
-않는다 — 상세는 §4.7.
+썼던 쿼리다. DB 스키마와 조회 함수(`getLegacyPairInviteEdges`,
+`apps/web/lib/participants.ts`)는 삭제하지 않았지만, `getAllEdges()`는 더
+이상 이 쿼리를 실행하지 않는다. 이 플로우가 쓰던 API 라우트와 UI 페이지
+자체는 코드베이스에서 삭제됐다(§1 참고) — "비활성 보존"은 DB 레이어에만
+해당한다.
 
 ```sql
 -- getAllEdges()가 더 이상 실행하지 않는 쿼리 — 참고용으로만 남긴다.
@@ -282,58 +361,24 @@ FROM pair_invites
 WHERE status = 'accepted' AND recipient_participant_id IS NOT NULL
 ```
 
-**비활성 보존 — Instagram 맞팔(`follows`)**: 각 참여자가 자기 following만
-업로드한다(followers는 아예 받지 않는다). 코드는 여전히 다음 조건이 모두
-성립할 때 A-B를 mutual-follow로 판정할 수 있는 자기 조인 쿼리를 갖고 있다:
-
-1. A가 `follows`에 "A → B" 방향을 신고했다 (A의 following.json에 B가 있음).
-2. B도 참여자로 존재하고, `follows`에 "B → A" 방향을 신고했다 (B의
-   following.json에 A가 있음).
-
-```sql
--- getAllEdges()가 더 이상 실행하지 않는 쿼리 — 참고용으로만 남긴다.
-SELECT DISTINCT f1.follower_participant_id AS a, p2.id AS b
-FROM follows f1
-JOIN participants p1 ON p1.id = f1.follower_participant_id
-JOIN participants p2 ON p2.identity_hash = f1.followee_identity_hash
-JOIN follows f2 ON f2.follower_participant_id = p2.id
-  AND f2.followee_identity_hash = p1.identity_hash
-WHERE f1.follower_participant_id < p2.id
-```
-
-`/api/upload`, `ig-parser`, `ImportOnboarding`/`UploadFlow`, `follows` 테이블,
-`syncFollowingBatch`는 모두 삭제하지 않고 그대로 남아 있다 — 다만
-`getAllEdges()`가 이 쿼리를 실행하지 않으므로, 두 사람이 아무리 서로를
-following으로 신고해도(맞팔이어도) 그 자체만으로는 그래프에 edge가 생기지
-않는다. `AGENTS.md` §1 원칙 5("지인 전용 초대 링크로 상대가 직접 확인했을
-때만 그래프에 edge가 생긴다... Instagram 팔로우 데이터는 edge 생성에 쓰지
-않는다")를 코드 레벨에서 그대로 강제하기 위한 선택이다. 결정 로그가 명시한
-"edge 확정 기준은 지인 확인 방식으로 통일한다"는 재검토 조건에 따라, 향후
-Instagram 연동을 다시 붙이더라도 맞팔 자체가 edge 확정 기준이 되는 일은
-없다(연결 후보 추천 등 보조 용도로만 재검토 — 그 경우도 이 섹션을 다시
-갱신한다).
-
-`pair_invites` accepted 행으로 골라낸 edge들로 `Map<NodeId, Set<NodeId>>`
-인접 리스트를 구성하고, 그 위에서 BFS로 최단 거리를 계산한다
-(`packages/graph`, 이 조회 로직과 완전히 분리돼 있어 전혀 손대지 않았다).
-
-- **참여자 생성 경로가 세 개다.** `upsertParticipant`(Instagram username 기반,
-  `identityHash`가 실제 해시), `createBootstrapParticipant`(Instagram 없는
-  최소 부트스트랩, `identityHash`가 무작위 opaque 값 `bootstrap:<hex>`),
+- **참여자 생성 경로가 두 개다.** `createBootstrapParticipant`(Instagram
+  없는 최소 부트스트랩, `identityHash`가 무작위 opaque 값 `bootstrap:<hex>`),
   `findOrCreateKakaoParticipant`(카카오 로그인, `identityHash`가 opaque 값
-  `kakao:<hex>`, 동일인 판별은 `oauth_accounts`가 담당, §4.6)가 모두 같은
-  `participants` 테이블에 행을 만든다 — 그래프 관점에서는 셋 다 동등한
-  노드다(§3.6 participant-only 원칙 유지).
-- **재업로드**: 참여자가 다시 업로드하면 그 사람이 follower인 `follows` 행을
-  여전히 전부 지우고 새 목록으로 교체한다(`syncFollowingBatch`) — 하지만
-  `getAllEdges()`가 `follows`를 조회하지 않으므로, 이 동기화는 지금은
-  그래프 결과에 아무 영향을 주지 않는다(Instagram 연동을 다시 활성화할
-  경우를 대비한 보존 로직). `pair_invites`/`acquaintance_links` 쪽은
-  재업로드로 바뀌지 않는다(둘 다 Instagram 업로드와 무관한 별도 흐름).
-- **규모 추정**: MVP 단계 참여자 수천~수만, `acquaintance_confirmations` 행
-  수는 참여자 수와 같은 자릿수로 늘어난다. 이 테이블만 읽어 BFS를 도는
-  비용은 이 규모에서 수십 ms 이내로,
-  [00_DEVELOPMENT_PRINCIPLES.md §4](./00_DEVELOPMENT_PRINCIPLES.md#4-성능ux-목표)의
+  `kakao:<hex>`, 동일인 판별은 `oauth_accounts`가 담당, §4.6)가
+  `participants` 테이블에 행을 만든다 — 그래프 관점에서는 둘 다 동등한
+  노드다(§3.6 participant-only 원칙 유지). `upsertParticipant`(Instagram
+  username 기반 upsert)는 코드에 남아 있지만 현재 어디서도 호출되지 않는다
+  — Instagram은 더 이상 참여자 생성 수단이 아니라, 이미 참여자인 사람이
+  나중에 `claimInstagramUsername`으로 자기 계정만 연동하는 방식으로
+  바뀌었다.
+- **재업로드**: 참여자가 다시 Instagram을 연동하면 그 사람이 follower인
+  `follows` 행을 전부 지우고 새 맞팔 목록으로 교체한다
+  (`syncInstagramMutuals`) — 단순 추가가 아니라 없어진 맞팔은 그래프에서도
+  사라진다. `acquaintance_links` 쪽은 재연동으로 바뀌지 않는다(둘 다
+  Instagram 연동과 무관한 별도 흐름).
+- **규모 추정**: MVP 단계 참여자 수천~수만, edge 후보(두 source 합산) 행
+  수는 참여자 수와 비슷한 자릿수로 늘어난다. 이 규모에서 BFS 비용은 수십
+  ms 이내로, [00_DEVELOPMENT_PRINCIPLES.md §4](./00_DEVELOPMENT_PRINCIPLES.md#4-성능ux-목표)의
   P95 400ms 목표에 여유 있게 들어온다. 참여자가 훨씬 늘어나 이 조회가
   느려지면 §4.3의 캐싱/델타 재계산 전략으로 넘어간다.
 
@@ -389,19 +434,27 @@ TASK-002의 `pair_invites`(1회용, 링크당 정확히 1명만 accept)는 TASK-
   등, 옵션 A)로의 이전을 검토한다 — "관계형 DB 안에서 그래프 확장을 얹는" 중간
   단계가 있다는 게 PostgreSQL을 유지하는 이유 중 하나다.
 
-### 4.4 reported vs verified edge (해결됨 — §4.2가 사실상 verified-only 모델)
+### 4.4 reported vs verified edge (해결됨 — 상대의 참여자 연동 여부가 verified 판정 기준)
 
 **이전 검토(2026-09-11)**: 당시 모델(followers ∩ following 자기 신고)은 A
 혼자 업로드해도 A-X edge가 생겨서, X 쪽 데이터로 독립 검증하지 않는다는 한계가
 있었다. `reported`(한쪽만 주장) → `verified`(양쪽 다 확인) 상태를 나중에
 추가하는 방향을 고려한다고 적어뒀었다.
 
-**현재 상태(2026-09-12)**: §4.2로 모델을 바꾸면서 이 구분이 필요 없어졌다 —
-`follows`는 항상 한쪽 방향의 신고(reported)만 담고, `getAllEdges()`가 양방향이
-모두 존재할 때만 edge로 인정하므로, **그래프에 나타나는 모든 edge는 이미
-verified다.** `reported`이지만 아직 `verified`가 아닌 관계(상대가 참여 안 했거나
-아직 맞팔이 아님)는 `follows`에는 남아있지만 BFS가 순회하는 그래프에는 전혀
-등장하지 않는다 — 별도 `verified` 컬럼 없이 조인 조건 자체가 그 역할을 한다.
+**2026-09-12~13 상태**: 당시 모델은 `follows`가 항상 한쪽 방향의 following
+신고만 담고, `getAllEdges()`가 양방향 신고가 모두 존재할 때만 edge로
+인정하는 self-join 방식이었다 — 조인 조건 자체가 verified 역할을 했다.
+
+**2026-09-14 갱신**: `follows`의 의미가 바뀌면서 verified 판정 기준도
+바뀌었다. `follows` 한 행은 이제 "일방향 following 신고"가 아니라 이미
+브라우저에서 교집합까지 계산된 맞팔 그 자체다 — 그래서 반대 방향 행을 찾아
+대조할 필요가 없다. 대신 **상대가 실제 참여자로 존재하고, 자기 Instagram
+계정도 연동했는지**(`participants.instagram_username_hash`와 일치하는지)가
+verified 판정 기준이다. 아직 참여하지 않았거나 연동 전인 상대의 해시는
+`follows`에는 남아있지만(§8 Path Check가 조회하는 바로 그 해시다) BFS가
+순회하는 그래프에는 등장하지 않는다 — `getAllEdges()`의
+`JOIN participants p ON p.instagram_username_hash = f.followee_identity_hash`
+조건이 그 역할을 한다(§4.2).
 
 ### 4.5 향후 고려사항: 분석 이벤트에는 raw distance를 그대로 사용
 
@@ -410,6 +463,134 @@ verified다.** `reported`이지만 아직 `verified`가 아닌 관계(상대가 
 건너 아는 사이")는 순수하게 표시용으로만 분리해서 다룬다 — 분석 데이터와
 UX 카피 변환을 섞지 않는다. 관련 변환 함수는
 [apps/web/lib/distance-copy.ts](../../apps/web/lib/distance-copy.ts)에 있다.
+
+### 4.9 타겟 챌린지 (`target_challenges`) — 2026-09-14
+
+`00_PRODUCT_DECISION_LOG.md`의 2026-09-14 "Path Check를 공유형 '타겟
+챌린지'로 확장" 결정에 따른 신규 테이블이다 — 그 앞 항목("개인용 Path
+Check")의 "새 테이블 금지, 인덱스 1개만" 제약은 이 결정으로 폐기됐다
+(§8 참고).
+
+```sql
+CREATE TABLE target_challenges (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  token text NOT NULL,
+  display_name text NOT NULL,
+  target_instagram_username_hash text NOT NULL,
+  creator_participant_id uuid NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+  is_public boolean NOT NULL DEFAULT false,      -- 2026-09-15 신규, 홈 공개 목록
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX target_challenges_token_key ON target_challenges (token);
+CREATE UNIQUE INDEX target_challenges_target_hash_key ON target_challenges (target_instagram_username_hash);
+```
+
+- `token`: 외부에 공유하는 opaque random 값(추측 불가능해야 함, 다른 토큰
+  들과 같은 방식으로 발급 — `randomBytes(16).toString("hex")`).
+- `display_name`: 챌린지를 만든 사람이 입력한 표시 이름. **검증된
+  인물명이 아니다** — Instagram API·profile scraping으로 자동 채우거나
+  검증하지 않는다. 오타·별명이어도 그대로 저장하고 그대로 보여준다.
+  2026-09-15 추가 결정으로 동일 target이면 챌린지를 하나로 합치므로,
+  최초 생성 시점 값이 계속 유지된다(이후 같은 target으로 제출된 다른
+  displayName은 버려진다).
+- `target_instagram_username_hash`: `hashInstagramUsername()`으로 만든
+  해시만 저장한다 — Instagram username 원문은 이 테이블에도, 다른 어떤
+  테이블에도 저장하지 않는다. **UNIQUE다(2026-09-15 결정)** — 같은
+  target으로는 챌린지를 중복 생성하지 않는다. `POST /api/challenges`가
+  이 제약 위반을 감지하면 새 행을 만들지 않고 기존 challenge의 `token`을
+  돌려준다(`status: "duplicate"`) — 단, 호출자를 그 challenge에 자동으로
+  합류시키지는 않는다(§8.2, §8.4).
+- `creator_participant_id`: 만든 사람. 이 값은 `GET /api/challenges/{token}`
+  응답에 절대 노출하지 않는다(§8.2) — 챌린지를 여는 사람에게 "누가
+  만들었는지"를 알려줄 필요·의도가 없다. **user-facing 조회(예: "이 해시로
+  challenge 목록 보여줘")는 여전히 만들지 않는다** — 이 UNIQUE 제약은
+  "정확한 username을 다시 입력했을 때 같은 challenge로 합류시키는" 용도일
+  뿐, challenge 탐색 API의 근거가 아니다.
+- `is_public`: **2026-09-15 "홈 공개 챌린지 목록" 결정으로 추가**
+  (`0014_loose_adam_destine.sql`). 공개 챌린지 목록 화면(`/challenges`,
+  홈에는 이 화면으로 가는 버튼만 둔다)에 노출해도 되는 챌린지인지 여부다.
+  **기본값은
+  false이고, 사용자용 공개/비공개 설정 UI는 만들지 않는다** — 운영자가
+  유명인·크리에이터처럼 공개해도 되는 대상만 직접 SQL로 켠다
+  (`UPDATE target_challenges SET is_public = true WHERE token = '…';`).
+  사용자가 만든 일반인 대상 챌린지가 자동으로 공개 디렉터리에 올라가는
+  경로를 코드·스키마 어디에도 두지 않기 위한 설계다. 공개 대상이 소수라
+  별도 인덱스는 두지 않았다. 조회는 `listPublicChallenges`
+  (`apps/web/lib/challenges.ts`) 하나뿐이고, 목록을 내보내는 공개 API
+  라우트는 만들지 않는다 — 홈과 `/challenges`의 서버 컴포넌트가 직접 읽는다.
+- 참여 현황("312명 참여")은 `challenge_participants` 행 수를 그대로 센다
+  (§4.11) — 별도 집계 테이블을 만들지 않았다. 이 숫자는 장식이 아니라 그
+  챌린지 탐색의 실제 start-set 크기다.
+
+### 4.10 `follows`에 필요한 인덱스 — 2026-09-14 (적용됨)
+
+타겟 챌린지의 Path Check(§8, `02_API_SPECS.md`)는
+`follows.followee_identity_hash`만으로 행을 찾아야 한다(어떤 참여자가
+올렸는지는 모른 채 대상 해시만 갖고 시작하므로). 그런데 기존 유니크
+제약은 `(follower_participant_id, followee_identity_hash)` 복합키라(§2),
+선행 컬럼이 `follower_participant_id`인 탓에 `followee_identity_hash`만으로
+조회하면 이 인덱스를 효율적으로 타지 못한다.
+
+```sql
+CREATE INDEX follows_followee_identity_hash_idx
+  ON follows (followee_identity_hash);
+```
+
+원문 저장이나 새 테이블 없이 순수 조회 성능을 위한 단일 컬럼 인덱스
+추가일 뿐이다. 마이그레이션 생성·적용 완료(`0010_uneven_aaron_stack.sql`).
+
+### 4.11 챌린지 참여(`challenge_participants`) — 2026-09-15 협업형 챌린지
+
+`00_PRODUCT_DECISION_LOG.md`의 2026-09-15 "협업형 챌린지" 결정에 따른 신규
+테이블이다. 챌린지의 그래프 탐색 시작점(start-set) 멤버십만 기록하는 순수 join
+table이다 — 새 edge를 만들지 않는다.
+
+```sql
+CREATE TABLE challenge_participants (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  challenge_id uuid NOT NULL REFERENCES target_challenges(id) ON DELETE CASCADE,
+  participant_id uuid NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+  joined_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (challenge_id, participant_id)
+);
+```
+
+- `/t/{token}` 페이지 뷰만으로는 행이 생기지 않는다("인스타에서 연결
+  가져오기"로 실제 가져오기를 완료했을 때 `InstagramImportFlow`가
+  참여로 등록한다 — `apps/web/lib/challenges.ts`의 `joinChallenge`).
+- 챌린지 생성자는 `createChallenge` 트랜잭션 안에서 자동으로 첫 참여자가 된다.
+- `UNIQUE(challenge_id, participant_id)`의 선행 컬럼이 `challenge_id`라
+  "이 챌린지의 start-set 전체 조회"(`computeChallengeProgress`가 매 요청마다
+  필요로 하는 조회)가 이 유니크 인덱스를 그대로 탄다 — `follows`와 달리 별도
+  단일 컬럼 인덱스가 필요 없다.
+- soft-delete/탈퇴 컬럼을 두지 않는다 — `acquaintance_confirmations`와 같은
+  이유로, 참여를 되돌리는 기능은 제공하지 않는다.
+- 마이그레이션: `packages/db/migrations/0011_oval_invaders.sql`.
+
+### 4.12 마지막 연결자 공개 동의(`participants.public_connector_name_consent_at`) — 2026-09-15
+
+`00_PRODUCT_DECISION_LOG.md`의 2026-09-15 "마지막 연결자 닉네임 조건부 공개"
+결정에 따른 컬럼이다. 새 테이블이 아니라 `participants`에 컬럼 하나를
+추가하는 것으로 충분했다 — "이 사람이 마지막 연결자로 계산됐을 때
+displayName을 공개해도 되는지"는 참여자 한 명당 값 하나로 표현되기
+때문이다.
+
+```sql
+ALTER TABLE participants
+  ADD COLUMN public_connector_name_consent_at timestamptz;
+```
+
+- NULL이 기본값이자 안전한 쪽이다 — NULL이면 어떤 경우에도 공개하지 않는다.
+- `apps/web/lib/participants.ts`의 `setDisplayName`이 **표시 이름을 처음
+  설정하는 순간에만** 이 값을 채운다(`display_name IS NULL`이었던 행만).
+  이미 표시 이름이 있는 상태에서 다시 호출돼도 이 값은 건드리지 않는다 —
+  현재 UI에서 이 함수의 유일한 호출부(화면 02)가 "길의 마지막 연결자가
+  되면 이 이름이 챌린지에 표시될 수 있어요"라는 고지를 보여준 뒤에만
+  제출을 받으므로, 최초 제출 = 동의로 본다.
+- 이 컬럼이 추가되기 전에 이미 표시 이름을 설정한 기존 participant는
+  이 문구를 본 적이 없으므로 값이 계속 NULL로 남는다 — 소급 공개되지
+  않는다는 뜻이다.
+- 마이그레이션: `packages/db/migrations/0013_true_ogun.sql`.
 
 ## 5. Related Documents
 

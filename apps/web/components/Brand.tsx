@@ -8,11 +8,19 @@ export function Icon({ name, className = "" }: { name: "arrow" | "back" | "insta
 }
 /**
  * 로고는 항상 `/`로 보낸다 — `/` 자체가 이미 로그인+표시 이름까지 마친
- * 세션이면 서버에서 `/result`로 리다이렉트하므로(apps/web/app/page.tsx),
+ * 세션이면 서버에서 `/create`로 리다이렉트하므로(apps/web/app/page.tsx),
  * 여기서 세션을 따로 확인할 필요가 없다.
+ *
+ * `explore`(기본 켜짐) — 우측 끝에 `/challenges`("진행 중인 공개 챌린지")로
+ * 가는 상시 진입점을 둔다(2026-09-15 결정). 홈 랜딩에만 두면 로그인+표시
+ * 이름을 마친 사용자는 `/`에서 `/create`로 리다이렉트돼 공개 챌린지를
+ * 영영 발견하지 못하기 때문이다. `home`("처음으로")이 이미 우측을 쓰고
+ * 있으면 이 링크는 생략한다 — 헤더 우측에 알약 두 개를 겹쳐 놓지 않는다.
+ * `/challenges` 자신처럼 자기 화면으로 가는 링크가 무의미한 곳은
+ * `explore={false}`로 끈다.
  */
-export function BrandHeader({ back = false, home = false }: { back?: boolean; home?: boolean }) {
-  return <header className={`brand-header ${back ? "center-logo" : ""}`}>{back && <Link className="back-button" href="/" aria-label="처음으로 돌아가기"><Icon name="back" /></Link>}<Link href="/" aria-label="가이 알아? 홈"><Image className="brand-logo" src="/assets/gai-ara_logo.png" width={150} height={50} priority alt="가이 알아?" /></Link>{!back && home && <Link className="small-link" href="/">처음으로<Icon name="arrow" /></Link>}</header>;
+export function BrandHeader({ back = false, home = false, explore = true }: { back?: boolean; home?: boolean; explore?: boolean }) {
+  return <header className={`brand-header ${back ? "center-logo" : ""}`}>{back && <Link className="back-button" href="/" aria-label="처음으로 돌아가기"><Icon name="back" /></Link>}<Link href="/" aria-label="가이 알아? 홈"><Image className="brand-logo" src="/assets/gai-ara_logo.png" width={150} height={50} priority alt="가이 알아?" /></Link>{!back && home && <Link className="small-link" href="/">처음으로<Icon name="arrow" /></Link>}{explore && !home && <Link className="small-link explore-link" href="/challenges">챌린지 구경</Link>}</header>;
 }
 export function Character({ kind = "wave", className = "" }: { kind?: "wave" | "search" | "heart" | "default" | "curious"; className?: string }) {
   return <Image src={`/assets/gamgyul-${kind}.png`} alt="귤 캐릭터" width={300} height={320} className={`character ${className}`} />;

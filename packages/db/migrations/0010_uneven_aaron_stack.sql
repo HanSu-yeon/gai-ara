@@ -1,0 +1,1 @@
+CREATE INDEX "follows_followee_identity_hash_idx" ON "follows" USING btree ("followee_identity_hash");

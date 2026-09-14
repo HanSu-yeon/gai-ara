@@ -58,3 +58,30 @@ export function formatConnectionSubtitle(distance: number): string {
   const intermediaries = distance - 1;
   return `둘 사이에 ${intermediaries}명의 지인이 이어져 있어요.`;
 }
+
+/**
+ * 2026-09-15 "홈 공개 챌린지 목록" 결정 — 홈 목록의 챌린지 한 줄짜리 상태
+ * 문구. 목록에서는 복잡한 상태를 만들지 않는다: "찾는 중"과 "N다리 발견"
+ * 두 가지뿐이다(원래 지시 §11).
+ *
+ * `distance`는 다른 화면과 똑같이 그래프 edge 수 그대로 받고, "N다리"
+ * 변환도 이 파일의 기존 규칙(intermediaries = distance - 1)을 그대로
+ * 따른다 — 목록이라고 다른 숫자를 쓰면 같은 챌린지를 눌러 들어간
+ * `/t/{token}`의 헤드라인과 숫자가 어긋난다. 다만 목록은 한 줄에 들어가야
+ * 하므로 한글 수사("네 다리")가 아니라 아라비아 숫자("4다리")를 쓴다.
+ *
+ * `participantCount`는 `challenge_participants` 행 수이고, 그 사람들이 곧
+ * 이 챌린지의 start-set이다 — "312명 참여"는 실제로 탐색에 쓰이는 숫자다.
+ * 경로를 이미 찾은 챌린지에서는 참여자 수 대신 발견한 거리를 보여준다.
+ */
+export function formatChallengeListStatus(
+  status: "searching" | "found",
+  distance: number | null,
+  participantCount: number,
+): string {
+  if (status === "found" && distance !== null) {
+    if (distance <= 1) return "바로 아는 사이 발견";
+    return `${distance - 1}다리 발견`;
+  }
+  return `${participantCount}명 참여 · 찾는 중`;
+}

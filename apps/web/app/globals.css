@@ -40,6 +40,7 @@ a, button { touch-action: manipulation; }
 .small-link svg { width:16px; height:16px; }
 .center-logo { justify-content:center; position:relative; }
 .back-button { position:absolute; left:0; background:#f2f0e8; border-radius:50%; padding:10px; }
+.center-logo .explore-link { position:absolute; right:0; }
 h1 { color:var(--color-deep-green); font-size:clamp(29px,8.8vw,42px); font-weight:900; letter-spacing:-1.8px; line-height:1.3; word-break:keep-all; }
 h1 em { color:var(--color-tangerine); font-style:normal; }
 .subtitle { color:#64666a; font-size:15px; line-height:1.7; margin-top:16px; word-break:keep-all; }
@@ -51,7 +52,33 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .landing-hero .primary-button { margin-top:22px; }
 .landing-basis { margin-top:48px; padding:18px; border-radius:20px; background:#f3f1e9; color:#777a76; word-break:keep-all; }
 .landing-basis h2 { color:var(--color-deep-green); font-family:var(--font-rounded), var(--font-sans); font-size:18px; font-weight:400; font-synthesis:none; letter-spacing:-.035em; }
-.landing-basis p { margin-top:10px; font-size:13px; line-height:1.7; }
+.landing-basis p { margin-top:14px; font-size:13px; line-height:1.7; }
+/* `/challenges` 공개 챌린지 목록(2026-09-15). 대시보드가 아니라 발견
+   영역이라 표/그리드/배지 대신 한 줄짜리 말랑한 행으로만 쓴다. */
+.public-challenge-list { display:flex; flex-direction:column; gap:8px; margin-top:14px; }
+.public-challenge-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-radius:16px; background:#fffdf7; border:1.6px solid #ece5d5; box-shadow:0 2px 0 #ece5d5; }
+.public-challenge-name { min-width:0; font-size:15px; font-weight:800; color:var(--color-deep-green); letter-spacing:-.03em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.public-challenge-status { flex-shrink:0; font-size:12.5px; font-weight:700; color:#8a8c87; letter-spacing:-.02em; }
+.public-challenge-status.is-found { color:var(--color-tangerine-dark); }
+.challenges-page-list { margin-top:24px; }
+.challenges-page-list .public-challenge-list { text-align:left; }
+.mini-path { display:flex; align-items:center; gap:5px; margin-top:14px; }
+.mini-path-item { display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0; }
+.mini-path-character { width:38px; height:41px; object-fit:contain; }
+.mini-path-dot { display:block; width:9px; height:9px; border-radius:50%; background:var(--color-pale-mint); border:1.6px solid #8eb49d; }
+.mini-path-qmark { font-family:var(--font-rounded), var(--font-sans); font-weight:400; font-synthesis:none; font-size:22px; line-height:1; color:var(--color-tangerine); }
+.mini-path-line { flex:1 1 auto; min-width:10px; height:2px; border-radius:2px; background:#d3cdbd; }
+.mini-path-caption { font-size:10.5px; font-weight:700; color:#8a8c87; }
+.challenge-path-strip { max-width:100%; justify-content:center; }
+.challenge-path-strip .mini-path-caption { max-width:64px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.challenge-path-chip { display:flex; align-items:center; justify-content:center; min-width:26px; height:20px; padding:0 7px; border-radius:99px; background:var(--color-pale-mint); border:1.6px solid #8eb49d; font-size:11px; font-weight:800; color:#1e5f42; }
+.last-connector-header { margin-top:18px; font-size:13px; font-weight:700; color:#18563a; }
+.challenge-fanout { display:flex; align-items:center; flex-shrink:0; }
+.challenge-fanout-branches { display:flex; flex-direction:column; gap:5px; padding:5px 0; margin:0 2px; border-left:2px solid #d3cdbd; border-right:2px solid #d3cdbd; }
+.challenge-fanout-branch { display:flex; align-items:center; gap:4px; padding:0 5px; }
+.challenge-fanout-branch-line { width:7px; height:2px; border-radius:2px; background:#d3cdbd; flex-shrink:0; }
+.challenge-fanout-node { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.challenge-fanout-name { font-size:9.5px; font-weight:700; color:#8a8c87; max-width:44px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .login-page .brand-header { margin-bottom:10px; }
 .login-content { display:flex; flex-direction:column; align-items:center; }
 .login-character { width:156px; height:168px; margin:8px auto 16px; }
@@ -168,6 +195,9 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .result-connect-option { display:flex; flex-direction:column; gap:4px; width:100%; padding:16px 18px; border:1px solid #e7e3d8; border-radius:16px; background:#fffdf8; text-align:left; }
 .result-connect-option-title { font-size:15px; font-weight:700; color:var(--color-deep-green); }
 .result-connect-option-desc { font-size:12.5px; color:#7f827d; line-height:1.5; }
+.result-ig-booster { margin-top:36px; }
+.result-ig-booster-title { margin:0; font-family:var(--font-rounded), var(--font-sans); font-size:19px; font-weight:400; color:var(--color-deep-green); }
+.result-ig-booster-desc { margin-top:8px; font-size:13px; color:#7f827d; line-height:1.6; }
 .connections-list { display:flex; flex-direction:column; gap:8px; margin-top:16px; }.connections-list-item { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border:1px solid #e7e3d8; border-radius:14px; text-align:left; }.connections-list-label { font-size:14px; font-weight:700; color:#18563a; overflow-wrap:anywhere; }.connections-list-status { font-size:12px; color:#7f827d; white-space:nowrap; }
 .referral-visits { display:flex; flex-direction:column; gap:6px; margin-top:10px; padding:0; list-style:none; }.referral-visits-item { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; padding:10px 14px; border:1px solid #e7e3d8; border-radius:12px; text-align:left; font-size:12px; background:white; font-family:inherit; cursor:pointer; }.referral-visits-item:hover { background:#f7f5ee; }.referral-visits-item span:first-child { font-weight:700; color:#18563a; overflow-wrap:anywhere; }.referral-visits-item span:last-child { color:#7f827d; white-space:nowrap; }
 .connections-radial { position:relative; width:min(300px,82vw); aspect-ratio:1; margin:28px auto 12px; }

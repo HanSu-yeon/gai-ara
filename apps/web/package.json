@@ -9,11 +9,12 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "echo 'no tests yet'"
+    "test": "node --test 'lib/**/*.test.ts'"
   },
   "dependencies": {
     "@gai-ara/db": "workspace:*",
     "@gai-ara/graph": "workspace:*",
+    "@gai-ara/ig-parser": "workspace:*",
     "@gai-ara/shared": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "next": "^16.3.4",

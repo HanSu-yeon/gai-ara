@@ -8,11 +8,12 @@ import { createHmac } from "node:crypto";
  * 움직여야 함) 무작위가 아니라 입력에 대해 결정적인 해시를 쓴다. 되돌릴
  * 수 없고, 이 값만으로 조회할 수 있는 API도 없다.
  *
- * `IDENTITY_PEPPER`는 원래 Instagram username 해싱용으로 만든 비밀 키였고
- * (그 기능은 2026-09-14에 레거시로 제거됐다), 여기서 같은 키를 새 용도로
- * 재사용한다 — 이미 모든 배포 환경에 설정돼 있는 서버 전용 비밀 키이고,
- * 이 해싱도 같은 성격(민감하지 않은 내부 식별자를 가리는 용도)이라 새
- * 환경 변수를 추가하지 않는다.
+ * `IDENTITY_PEPPER`는 원래 Instagram username 해싱용으로 만든 비밀 키다
+ * (2026-09-14 Instagram import 재도입으로 `lib/instagram-identity.ts`의
+ * `hashInstagramUsername`이 다시 이 키를 쓴다). 여기서는 같은 키를 또
+ * 다른 용도로 재사용한다 — 이미 모든 배포 환경에 설정돼 있는 서버 전용
+ * 비밀 키이고, 이 해싱도 같은 성격(민감하지 않은 내부 식별자를 가리는
+ * 용도)이라 새 환경 변수를 추가하지 않는다.
  */
 export function hashParticipantId(participantId: string): string {
   const pepper = process.env.IDENTITY_PEPPER;

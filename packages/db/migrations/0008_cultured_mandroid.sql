@@ -1,0 +1,2 @@
+ALTER TABLE "participants" ADD COLUMN "instagram_username_hash" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "participants_instagram_username_hash_key" ON "participants" USING btree ("instagram_username_hash");
