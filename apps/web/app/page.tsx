@@ -30,17 +30,17 @@ export default async function LandingPage() {
           <Character kind="curious" className="duo-character-flip" />
         </div>
         <h1>
-          나는 누구와 건너건너
+          혹시 나도 유명인이랑
           <br />
-          아는 사이일까?
+          건너건너 아는 사이일까?
         </h1>
         <p className="subtitle">
-          아는 사람들과 이어지다 보면
+          아는 사람을 따라가다 보면
           <br />
-          생각지도 못한 사람과 닿을지도 몰라요.
+          생각지도 못한 사람과 이어질지도 몰라요.
         </p>
         <Link className="primary-button" href="/login">
-          시작해보기
+          확인해보기
         </Link>
         <section className="landing-basis" aria-labelledby="landing-basis-title">
           <h2 id="landing-basis-title">세상은 생각보다 좁대요</h2>
