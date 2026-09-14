@@ -6,10 +6,12 @@ import { formatChallengeListStatus } from "@/lib/distance-copy";
 /**
  * "이 사람까지 진짜 이어질까?" 공개 챌린지 — 2026-09-15 결정.
  *
- * **진행 중인 챌린지 목록을 볼 수 있는 곳은 `/challenges` 한 곳뿐이다.**
- * 다른 화면들은 헤더 우측 끝의 "챌린지 구경" 알약(`BrandHeader`의
- * `explore`)으로 이 화면에 들어올 뿐, 목록을 직접 그리지 않는다. 목록이 여러 화면에 흩어지면 홈이 대시보드처럼 보이고,
- * "어디서 뭘 보는 화면인지"가 흐려지기 때문이다.
+ * **공개 챌린지 목록을 볼 수 있는 곳은 `/challenges` 한 곳뿐이다.** 홈은
+ * 목록을 직접 그리지 않고 그 화면으로 가는 버튼만 두고(`PublicChallengeEntry`),
+ * `/create`에는 아예 노출하지 않는다. 목록이 여러 화면에 흩어지면 홈이
+ * 대시보드처럼 보이고 "어디서 뭘 보는 화면인지"가 흐려지기 때문이다.
+ * (자기가 만들었거나 참여한 챌린지를 모아 보는 `/me`는 별개다 — 거기서는
+ * `is_public`과 무관하게 자기 것만 자기에게 보여준다.)
  *
  * **모든 user-created 챌린지를 자동으로 공개하지 않는다** — `is_public`을
  * 운영자가 직접 켠 챌린지만 `listPublicChallenges`가 돌려준다. 일반인
@@ -40,8 +42,6 @@ export async function PublicChallengeList() {
     return <p className="status-caption">목록을 불러오지 못했어요. 잠시 후 다시 열어주세요.</p>;
   }
 
-  // 홈의 버튼은 항상 떠 있으므로 빈 상태로 들어올 수 있다 — 빈 화면 대신
-  // 여기서 안내하고, 자기 챌린지를 만드는 쪽으로 이어준다.
   if (challenges.length === 0) {
     return (
       <p className="status-caption">
@@ -52,6 +52,28 @@ export async function PublicChallengeList() {
     );
   }
 
+  return <ChallengeRows challenges={challenges} progresses={progresses} />;
+}
+
+/**
+ * 챌린지 한 줄짜리 행 목록. `/challenges`(공개 목록)와 `/me`(내 챌린지)가
+ * 같은 모양을 쓰도록 공유한다 — 한 줄에 이름 + 상태 한 마디뿐이고, 상태는
+ * "N명 참여 · 찾는 중"과 "N다리 발견" 두 가지만 쓴다(원래 지시 §11).
+ * 항목 전체를 누르면 `/t/{token}`으로 간다.
+ */
+export function ChallengeRows({
+  challenges,
+  progresses,
+}: {
+  challenges: ReadonlyArray<{
+    token: string;
+    displayName: string;
+    participantCount: number;
+    /** `/me`에서만 쓴다 — 내가 만든 챌린지에 작은 표시를 붙인다. */
+    isCreator?: boolean;
+  }>;
+  progresses: ReadonlyArray<{ status: "searching" | "found"; distance: number | null }>;
+}) {
   return (
     <ul className="public-challenge-list">
       {challenges.map((challenge, index) => {
@@ -60,7 +82,10 @@ export async function PublicChallengeList() {
         return (
           <li key={challenge.token}>
             <Link href={`/t/${challenge.token}`} className="public-challenge-item">
-              <span className="public-challenge-name">{challenge.displayName}</span>
+              <span className="public-challenge-name">
+                {challenge.displayName}
+                {challenge.isCreator && <span className="challenge-mine-chip">내가 만든</span>}
+              </span>
               <span
                 className={
                   progress.status === "found"
@@ -75,5 +100,27 @@ export async function PublicChallengeList() {
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * 홈(화면 01) 본문에 두는 발견 입구 — 2026-09-15 결정. 목록을 미리 그리지
+ * 않고 제목·보조 카피와 함께 `/challenges`로 가는 버튼만 둔다. 헤더 우측은
+ * "내 챌린지"(`/me`)가 쓰므로, 발견 쪽 입구는 홈 본문이 맡는다.
+ *
+ * 공개 챌린지 수와 무관하게 항상 보여준다 — 화면을 이동하는 버튼이라 홈의
+ * 구성이 DB 상태에 따라 나타났다 사라지지 않는 편이 낫고, 비어 있는 경우는
+ * `/challenges`가 자기 화면에서 안내한다. 덕분에 홈 렌더링에 DB 조회가
+ * 하나도 추가되지 않는다.
+ */
+export function PublicChallengeEntry() {
+  return (
+    <section className="public-challenges" aria-labelledby="public-challenges-title">
+      <h2 id="public-challenges-title">이 사람까지 진짜 이어질까?</h2>
+      <p className="public-challenges-lead">아는 사이가 모여 건너건너 이어져요.</p>
+      <Link href="/challenges" className="public-challenges-more">
+        진행 중인 챌린지 보기 →
+      </Link>
+    </section>
   );
 }

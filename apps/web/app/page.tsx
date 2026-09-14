@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { BrandHeader, Character } from "@/components/Brand";
+import { PublicChallengeEntry } from "@/components/PublicChallengeList";
 import { isBackendConfigured } from "@/lib/env";
 import { getDisplayName } from "@/lib/participants";
 import { getSessionParticipantId } from "@/lib/session";
@@ -18,12 +19,13 @@ import { getSessionParticipantId } from "@/lib/session";
  * 로그인+표시 이름이 끝났으면 `/login`을 한 번 거치게 하지 않고 곧장
  * `/create`로 보낸다.
  *
- * 2026-09-15 추가 결정 — 랜딩 본문은 메인 후킹("혹시 나도 유명인이랑
- * 건너건너 아는 사이일까?")과 CTA 그대로 두고 아무것도 더하지 않는다.
- * 공개 챌린지(`/challenges`)로 가는 입구는 헤더 우측 끝의 "챌린지 구경"
- * 알약 하나뿐이다(`BrandHeader`의 `explore`) — 홈 본문에 섹션까지 두면
- * 한 화면에 같은 목적지 버튼이 두 개가 되고, 랜딩의 시선이 메인 CTA에서
- * 분산된다. 덕분에 이 페이지는 공개 챌린지 때문에 DB를 읽지 않는다.
+ * 2026-09-15 추가 결정 — 메인 후킹("혹시 나도 유명인이랑 건너건너 아는
+ * 사이일까?")과 CTA는 그대로 두고, 그 아래에 "이 사람까지 진짜 이어질까?"
+ * 공개 챌린지 입구(`PublicChallengeEntry`)를 둔다. 아직 만들 대상이
+ * 떠오르지 않은 첫 방문자가 남이 만든 챌린지를 눌러 바로 참여해볼 수 있는
+ * 입구다 — 목록은 그리지 않고 `/challenges`로 가는 버튼만 둔다. 헤더 우측
+ * 알약은 "내 챌린지"(`/me`)가 쓰므로 한 화면에 같은 목적지 버튼이 두 개
+ * 생기지 않는다. 이 섹션은 DB를 읽지 않는다.
  */
 export default async function LandingPage() {
   let ready = false;
@@ -59,6 +61,7 @@ export default async function LandingPage() {
         <Link className="primary-button" href={createHref}>
           챌린지 만들어보기
         </Link>
+        <PublicChallengeEntry />
         <section
           className="landing-basis"
           aria-labelledby="landing-basis-title"

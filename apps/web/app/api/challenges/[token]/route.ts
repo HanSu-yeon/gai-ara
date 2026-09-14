@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getChallengeByToken } from "@/lib/challenges";
-import { computeChallengePublicResult } from "@/lib/graph-service";
+import { getChallengeByToken, hasJoinedChallenge } from "@/lib/challenges";
+import { computeChallengePublicResult, computeViewerChallengeDistance } from "@/lib/graph-service";
+import { getSessionParticipantId } from "@/lib/session";
 import { isBackendConfigured } from "@/lib/env";
 
 /**
@@ -31,5 +32,21 @@ export async function GET(
 
   const result = await computeChallengePublicResult(challenge);
 
-  return NextResponse.json({ displayName: challenge.displayName, ...result });
+  // 2026-09-15 추가 — 로그인한 뷰어에게는 "나는 몇 다리인지"도 함께 준다.
+  // 로그인하지 않았으면 계산 자체를 하지 않는다(항상 null) — 이 라우트는
+  // 비로그인으로도 열려야 하는 공개 조회라 세션이 없는 게 정상이다.
+  const viewerParticipantId = await getSessionParticipantId();
+  const viewerDistance = viewerParticipantId
+    ? await computeViewerChallengeDistance(challenge, viewerParticipantId)
+    : null;
+  const viewerJoined = viewerParticipantId
+    ? await hasJoinedChallenge(challenge.id, viewerParticipantId)
+    : false;
+
+  return NextResponse.json({
+    displayName: challenge.displayName,
+    viewerDistance,
+    viewerJoined,
+    ...result,
+  });
 }

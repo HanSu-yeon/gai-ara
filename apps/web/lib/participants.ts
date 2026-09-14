@@ -344,6 +344,73 @@ export async function getAllEdges(): Promise<Array<{ a: string; b: string }>> {
 }
 
 /**
+ * 2026-09-15 — `/result`가 "이미 가져왔는지"와 "실제로 몇 명과 이어졌는지"를
+ * 구분해서 보여주기 위한 요약. 두 숫자가 다를 수 있다는 게 이 화면의 핵심
+ * 정보다: Instagram 맞팔은 **상대도 참여자이고 자기 계정을 연동했을 때만**
+ * edge가 되므로(`AGENTS.md` §1 원칙 5), 맞팔 33명을 가져와도 이어진 사람이
+ * 0명일 수 있다. 그 사실을 숨기면 "데이터를 넣었는데 왜 아무것도 없지?"가
+ * 된다.
+ *
+ * - `importedMutuals`: 내가 올린 맞팔 수(`follows` 행 수).
+ * - `connectedPeople`: 전역 trusted graph에서 나와 직접 이어진 사람 수.
+ *   `getAllEdges()`와 **똑같은 두 source**를 쓰되 나에게 닿는 것만 센다 —
+ *   지인 확인, 내 맞팔 중 참여자인 사람, 그리고 남의 맞팔 목록에 내가 들어
+ *   있는 경우(반대 방향)까지 포함한다.
+ * - `hasLinkedInstagram`: 내 Instagram 계정을 연동했는지(= 한 번이라도
+ *   가져오기를 끝냈는지).
+ */
+export interface ConnectionSummary {
+  hasLinkedInstagram: boolean;
+  importedMutuals: number;
+  connectedPeople: number;
+}
+
+export async function getConnectionSummary(participantId: string): Promise<ConnectionSummary> {
+  const db = getDb();
+  const result = await db.execute<{
+    has_linked_instagram: boolean;
+    imported_mutuals: number;
+    connected_people: number;
+  }>(sql`
+    SELECT
+      (SELECT instagram_username_hash IS NOT NULL FROM participants WHERE id = ${participantId})
+        AS has_linked_instagram,
+      (SELECT count(*) FROM follows WHERE follower_participant_id = ${participantId})
+        AS imported_mutuals,
+      (
+        SELECT count(DISTINCT peer) FROM (
+          SELECT CASE
+                   WHEN al.owner_participant_id = ${participantId} THEN ac.confirmer_participant_id
+                   ELSE al.owner_participant_id
+                 END AS peer
+          FROM acquaintance_confirmations ac
+          JOIN acquaintance_links al ON al.id = ac.link_id
+          WHERE al.owner_participant_id = ${participantId}
+             OR ac.confirmer_participant_id = ${participantId}
+          UNION
+          SELECT p.id AS peer
+          FROM follows f
+          JOIN participants p ON p.instagram_username_hash = f.followee_identity_hash
+          WHERE f.follower_participant_id = ${participantId} AND p.id <> ${participantId}
+          UNION
+          SELECT f.follower_participant_id AS peer
+          FROM follows f
+          JOIN participants me ON me.id = ${participantId}
+          WHERE f.followee_identity_hash = me.instagram_username_hash
+            AND f.follower_participant_id <> ${participantId}
+        ) peers
+      ) AS connected_people
+  `);
+
+  const row = [...result][0];
+  return {
+    hasLinkedInstagram: Boolean(row?.has_linked_instagram),
+    importedMutuals: Number(row?.imported_mutuals ?? 0),
+    connectedPeople: Number(row?.connected_people ?? 0),
+  };
+}
+
+/**
  * 이 참여자가 확정된 관계를 하나라도 갖고 있는지("edge가 0개인 신규
  * 참여자인지")만 저렴하게 확인한다 — `/r/{token}` path-not-found 화면이
  * "아직 내 그래프가 시작 안 됨"과 "그래프는 있지만 이 상대까지는 아직

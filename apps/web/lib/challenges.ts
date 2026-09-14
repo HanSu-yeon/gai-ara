@@ -182,6 +182,56 @@ export async function listPublicChallenges(limit?: number): Promise<PublicChalle
   return await (limit === undefined ? query : query.limit(limit));
 }
 
+/**
+ * 2026-09-15 "내 챌린지" 결정 — `/me`가 쓴다. 내가 만들었거나(`creator_participant_id`)
+ * 내가 참여한(`challenge_participants`) 챌린지를 최신순으로 전부 돌려준다.
+ *
+ * 만든 직후 `/t/{token}`을 벗어나면 토큰을 다시 찾을 방법이 없던 문제를
+ * 해결하기 위한 조회다 — `is_public`과 무관하게, **오직 자기 자신의**
+ * 챌린지만 자기에게 보여준다. 남의 챌린지를 찾아보는 용도가 아니므로
+ * `AGENTS.md` §1 원칙 3의 "challenge 전체 목록/탐색" 금지와 충돌하지
+ * 않는다(참여자 id를 파라미터로 받고, 세션 주인의 id만 넘어온다).
+ */
+export interface MyChallengeSummary extends PublicChallengeSummary {
+  isCreator: boolean;
+}
+
+export async function listMyChallenges(participantId: string): Promise<MyChallengeSummary[]> {
+  const db = getDb();
+  const rows = await db.execute<{
+    id: string;
+    token: string;
+    display_name: string;
+    target_instagram_username_hash: string;
+    participant_count: number;
+    is_creator: boolean;
+  }>(sql`
+    SELECT
+      tc.id,
+      tc.token,
+      tc.display_name,
+      tc.target_instagram_username_hash,
+      (SELECT count(*) FROM challenge_participants x WHERE x.challenge_id = tc.id) AS participant_count,
+      (tc.creator_participant_id = ${participantId}) AS is_creator
+    FROM target_challenges tc
+    WHERE tc.creator_participant_id = ${participantId}
+       OR EXISTS (
+         SELECT 1 FROM challenge_participants cp
+         WHERE cp.challenge_id = tc.id AND cp.participant_id = ${participantId}
+       )
+    ORDER BY tc.created_at DESC
+  `);
+
+  return [...rows].map((row) => ({
+    id: row.id,
+    token: row.token,
+    displayName: row.display_name,
+    targetInstagramUsernameHash: row.target_instagram_username_hash,
+    participantCount: Number(row.participant_count),
+    isCreator: row.is_creator,
+  }));
+}
+
 /** Path Check 계산에 필요한 전체 정보(내부용) — API 응답에 그대로 내보내지 않는다. */
 export async function getChallengeByToken(token: string): Promise<ChallengeDetail | null> {
   const db = getDb();

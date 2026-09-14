@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { ChallengePublicInfo } from "@gai-ara/shared";
 import { BrandHeader, Centered, Character, StatusMessage } from "@/components/Brand";
 import { ChallengePathStrip } from "@/components/ChallengePathStrip";
-import { formatConnectionHeadline } from "@/lib/distance-copy";
+import { formatConnectionHeadline, formatConnectionPhrase } from "@/lib/distance-copy";
 
 type LoadStatus = "loading" | "not-found" | "ready";
 
@@ -108,6 +108,7 @@ export default function TargetChallengeScreen() {
           lastConnectorCount={info.lastConnectorCount}
           visibleLastConnectorNames={info.visibleLastConnectorNames}
         />
+        <ViewerDistanceNote viewerDistance={info.viewerDistance} />
         <button type="button" className="primary-button mt-6" onClick={handleShareChallenge} disabled={sharing}>
           {sharing ? "공유하는 중…" : "챌린지 공유하기"}
         </button>
@@ -121,7 +122,7 @@ export default function TargetChallengeScreen() {
       <BrandHeader />
       <div className="duo-art" role="img" aria-label="아직 연결을 찾지 못한 귤 캐릭터 두 마리">
         <Character kind="curious" />
-        <span className="duo-dots" aria-hidden="true">···</span>
+        <span className="duo-dots" aria-hidden="true"><span /><span /><span /></span>
         <Character kind="curious" className="duo-character-flip" />
       </div>
       <h1 className="upload-heading">
@@ -130,17 +131,61 @@ export default function TargetChallengeScreen() {
         닿을 수 있을까?
       </h1>
       <p className="subtitle">
-        아직 {info.displayName}까지 가는 길을
-        <br />
-        찾고 있어요.
+        아직 가는 길을 찾고 있어요.
       </p>
-      <Link href={`/upload?step=form&returnTo=${encodeURIComponent(`/t/${token}`)}`} className="primary-button mt-5">
-        나도 연결 보태기
-      </Link>
-      <p className="status-caption">서로 팔로우하는 사람만 연결에 사용해요.</p>
-      <button type="button" className="text-link text-xs mt-4" onClick={handleShareChallenge} disabled={sharing}>
-        {sharing ? "공유하는 중…" : "이 챌린지 친구에게 보내기 →"}
-      </button>
+      <ViewerDistanceNote viewerDistance={info.viewerDistance} />
+
+      {info.viewerJoined ? (
+        <>
+          {/*
+            이미 연결을 보탠 사람에게 "나도 연결 보태기"를 다시 내밀지
+            않는다(2026-09-15 결정) — 그 사람에게 남은 다음 행동은 연결을
+            또 보태는 게 아니라 챌린지를 퍼뜨려 다른 사람의 연결을 부르는
+            것이다. 다시 가져오기 자체는 막지 않는다(맞팔은 시간이 지나면
+            달라진다) — 메인 CTA에서만 내린다.
+          */}
+          <button type="button" className="primary-button mt-5" onClick={handleShareChallenge} disabled={sharing}>
+            {sharing ? "공유하는 중…" : "챌린지 공유하기"}
+          </button>
+          <p className="status-caption">친구가 연결을 보태면 길이 열릴 수 있어요.</p>
+          <Link
+            href={`/upload?step=form&returnTo=${encodeURIComponent(`/t/${token}`)}`}
+            className="text-link text-xs mt-4"
+          >
+            아는 사람 더 가져오기 →
+          </Link>
+        </>
+      ) : (
+        <>
+          <Link
+            href={`/upload?step=form&returnTo=${encodeURIComponent(`/t/${token}`)}`}
+            className="primary-button mt-5"
+          >
+            나도 연결 보태기
+          </Link>
+          <p className="status-caption">서로 팔로우하는 사람만 연결에 사용해요.</p>
+          <button type="button" className="public-challenges-more mt-4" onClick={handleShareChallenge} disabled={sharing}>
+            {sharing ? "공유하는 중…" : "챌린지 공유하기"}
+          </button>
+        </>
+      )}
     </main>
   );
+}
+
+/**
+ * 2026-09-15 추가 결정 — 챌린지 전체의 진행 상황과 별개로 "나는 몇 다리인지"를
+ * 한 줄로 보여준다. 두 숫자는 서로 다른 질문의 답이라 나란히 있어도 모순이
+ * 아니다: 챌린지가 아직 `searching`인데 내게는 길이 있을 수 있고(그때 "나도
+ * 연결 보태기"를 누르면 그 순간 챌린지가 풀린다), 챌린지는 이미 `found`인데
+ * 나는 닿지 않을 수도 있다.
+ *
+ * 비로그인이거나 길이 없으면(`null`) 아무것도 그리지 않는다 — "당신은 아직
+ * 이어지지 않았어요" 같은 문구는 쓰지 않는다. 아직 데이터를 보태지 않은
+ * 사람에게 실패처럼 읽히고, 이 화면의 다음 행동(연결 보태기)은 어차피
+ * 바로 아래 버튼이 안내하기 때문이다.
+ */
+function ViewerDistanceNote({ viewerDistance }: { viewerDistance: number | null }) {
+  if (viewerDistance === null) return null;
+  return <p className="viewer-distance-note">나는 {formatConnectionPhrase(viewerDistance)}</p>;
 }

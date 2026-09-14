@@ -318,8 +318,9 @@ function findLastConnectors(
 async function computeChallengeReachability(
   challenge: { id: string; targetInstagramUsernameHash: string },
   prebuiltGraph?: AdjacencyList,
+  startSetOverride?: readonly string[],
 ): Promise<ChallengeReachability> {
-  const startSet = await getChallengeParticipantIds(challenge.id);
+  const startSet = startSetOverride ?? (await getChallengeParticipantIds(challenge.id));
   if (startSet.length === 0) return NO_REACHABILITY;
 
   const graph = prebuiltGraph ?? buildGraph(await getAllEdges());
@@ -404,6 +405,31 @@ export async function computeChallengeProgressBatch(
     progresses.push({ status, distance });
   }
   return progresses;
+}
+
+/**
+ * 2026-09-15 추가 결정 — 챌린지 전체의 진행 상황과 **별개로**, 지금 이
+ * 화면을 보고 있는 본인이 target까지 몇 다리인지 계산한다.
+ *
+ * 챌린지 진행 상황("우리가 길을 찾았는가", start-set 기준)과 뷰어 개인의
+ * 거리("나는 몇 다리인가")는 서로 다른 질문이고 둘 다 의미가 있다 — 챌린지가
+ * 아직 `searching`인데 뷰어에게는 길이 있을 수 있고(그 뷰어가 "나도 연결
+ * 보태기"를 누르면 그 순간 챌린지가 풀린다), 반대로 챌린지는 이미 `found`인데
+ * 뷰어 본인은 닿지 않을 수도 있다. 이 문서의 초판이 폐기했던 `POST
+ * /api/challenges/{token}/check`(뷰어 기준 connected/not_connected)와 달리,
+ * 이 값은 챌린지 전체 상태를 대체하지 않고 **함께** 보여주는 보조 정보다.
+ *
+ * 계산은 start-set만 "나 한 명"으로 바꾼 것 외에는 챌린지 진행 상황과
+ * 완전히 동일하다 — 같은 전역 trusted graph, 같은 external leaf 처리,
+ * 같은 거리 규칙. 반환값은 거리 숫자 하나뿐이고 중간 경로의 identity는
+ * 어디에도 담기지 않는다(`AGENTS.md` §1 원칙 4).
+ */
+export async function computeViewerChallengeDistance(
+  challenge: { id: string; targetInstagramUsernameHash: string },
+  viewerParticipantId: string,
+): Promise<number | null> {
+  const { status, distance } = await computeChallengeReachability(challenge, undefined, [viewerParticipantId]);
+  return status === "found" ? distance : null;
 }
 
 /** 공개 결과에 표시할 수 있는 마지막 연결자 닉네임 상한(390px 기준, 2026-09-15 결정). */

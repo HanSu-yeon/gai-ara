@@ -48,7 +48,7 @@ export default function LoginScreen({
       )
       .then((session) => {
         if (session.active && session.hasDisplayName) {
-          router.replace(returnTo ?? "/result");
+          router.replace(returnTo ?? "/");
           return;
         }
         setState(session.active ? "needs-name" : "logged-out");
@@ -69,7 +69,7 @@ export default function LoginScreen({
       });
       if (!response.ok)
         throw new Error("이름을 저장하지 못했어요. 다시 시도해주세요.");
-      router.replace(returnTo ?? "/connect");
+      router.replace(returnTo ?? "/");
     } catch (err) {
       setError(
         err instanceof Error

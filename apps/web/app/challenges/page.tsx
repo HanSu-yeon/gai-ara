@@ -33,7 +33,7 @@ export const dynamic = "force-dynamic";
 export default function PublicChallengesPage() {
   return (
     <main className="brand-page challenges-page">
-      <BrandHeader back explore={false} />
+      <BrandHeader back />
       <h1 className="upload-heading">
         이 사람까지
         <br />

@@ -4,8 +4,13 @@
     {
       "name": "gai-ara-web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@gai-ara/web", "dev"],
-      "port": 3000
+      "runtimeArgs": [
+        "--filter",
+        "@gai-ara/web",
+        "dev"
+      ],
+      "port": 3000,
+      "autoPort": false
     }
   ]
 }

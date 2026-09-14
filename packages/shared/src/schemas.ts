@@ -234,6 +234,27 @@ export type ChallengePublicResult = z.infer<typeof challengePublicResultSchema>;
  */
 export const challengePublicInfoSchema = z.object({
   displayName: z.string(),
+  /**
+   * 2026-09-15 추가 결정 — 챌린지 전체의 진행 상황과 **별개로**, 지금
+   * 이 화면을 보는 본인이 target까지 몇 다리인지. 로그인한 뷰어에게만
+   * 채워지고(비로그인이면 항상 null), 길이 없으면 null이다.
+   *
+   * 챌린지 status/distance를 대체하지 않고 함께 내려간다 — 챌린지는 아직
+   * `searching`인데 뷰어에게는 길이 있을 수 있고(그 뷰어가 참여하면 그
+   * 순간 챌린지가 풀린다), 반대일 수도 있다. 값은 거리 숫자 하나뿐이고
+   * 중간 경로의 identity는 담기지 않는다.
+   */
+  viewerDistance: z.number().int().nonnegative().nullable(),
+  /**
+   * 이 뷰어가 이미 이 챌린지에 참여했는지(`challenge_participants`에 행이
+   * 있는지). 비로그인이면 항상 false다. 이미 참여한 사람에게 "나도 연결
+   * 보태기"를 다시 내밀지 않기 위한 값이다 — 그 사람에게 남은 다음 행동은
+   * 연결을 또 보태는 게 아니라 챌린지를 퍼뜨리는 것이다.
+   *
+   * 참여자 수(`challenge_participants` 행 수)나 참여자 목록은 이 응답에
+   * 담지 않는다 — "나 자신이 참여했는가"라는 불리언 하나뿐이다.
+   */
+  viewerJoined: z.boolean(),
 }).merge(challengePublicResultSchema);
 export type ChallengePublicInfo = z.infer<typeof challengePublicInfoSchema>;
 

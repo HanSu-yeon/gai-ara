@@ -147,15 +147,23 @@ export function InstagramImportFlow({ startAtForm = false, returnTo = null }: { 
   }
 
   if (status === "parsing" || status === "uploading") {
+    // 다른 상태들과 같은 `brand-page upload-page` 래퍼 안에 둔다 — 이 래퍼가
+    // 좌우 여백·배경·장식을 전부 담당하므로, 예전처럼 `<section>`만 돌려주면
+    // 본문이 화면 가장자리에 붙고 헤더도 사라진다(globals.css의
+    // `.upload-page:has(.analysis-state)` 규칙도 이 중첩을 전제로 쓰였다).
+    // 분석 중에는 실수로 이탈하지 않도록 뒤로가기 없는 헤더를 쓴다.
     return (
-      <section className="analysis-state" role="status" aria-live="polite">
-        <Steps active={1} />
-        <h1 className="upload-heading">서로 아는 사람을<br /><em>찾고 있어요</em></h1>
-        <ConnectionSearchArt />
-        <p className="subtitle">조금만 기다려주세요.</p>
-        <div className="progress-track" />
-        <p className="status-caption">{status === "parsing" ? "파일에서 맞팔 관계를 확인하고 있어요…" : "가져오는 중이에요…"}</p>
-      </section>
+      <main className="brand-page upload-page">
+        <BrandHeader />
+        <section className="analysis-state" role="status" aria-live="polite">
+          <Steps active={1} />
+          <h1 className="upload-heading">서로 아는 사람을<br /><em>찾고 있어요</em></h1>
+          <ConnectionSearchArt />
+          <p className="subtitle">조금만 기다려주세요.</p>
+          <div className="progress-track" />
+          <p className="status-caption">{status === "parsing" ? "파일에서 맞팔 관계를 확인하고 있어요…" : "가져오는 중이에요…"}</p>
+        </section>
+      </main>
     );
   }
 
