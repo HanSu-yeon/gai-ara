@@ -11,8 +11,8 @@ export function Icon({ name, className = "" }: { name: "arrow" | "back" | "insta
  * 세션이면 서버에서 `/result`로 리다이렉트하므로(apps/web/app/page.tsx),
  * 여기서 세션을 따로 확인할 필요가 없다.
  */
-export function BrandHeader({ back = false, home = false }: { back?: boolean; home?: boolean }) {
-  return <header className={`brand-header ${back ? "center-logo" : ""}`}>{back && <Link className="back-button" href="/" aria-label="처음으로 돌아가기"><Icon name="back" /></Link>}<Link href="/" aria-label="가이 알아? 홈"><Image className="brand-logo" src="/assets/gai-ara_logo.png" width={150} height={50} priority alt="가이 알아?" /></Link>{!back && home && <Link className="small-link" href="/">처음으로<Icon name="arrow" /></Link>}</header>;
+export function BrandHeader({ back = false, home = false, action }: { back?: boolean; home?: boolean; action?: ReactNode }) {
+  return <header className={`brand-header ${back ? "center-logo" : ""}`}>{back && <Link className="back-button" href="/" aria-label="처음으로 돌아가기"><Icon name="back" /></Link>}<Link href="/" aria-label="가이 알아? 홈"><Image className="brand-logo" src="/assets/gai-ara_logo.png" width={150} height={50} priority alt="가이 알아?" /></Link>{!back && (home ? <Link className="small-link" href="/">처음으로<Icon name="arrow" /></Link> : action)}</header>;
 }
 export function Character({ kind = "wave", className = "" }: { kind?: "wave" | "search" | "heart" | "default" | "curious"; className?: string }) {
   return <Image src={`/assets/gamgyul-${kind}.png`} alt="귤 캐릭터" width={300} height={320} className={`character ${className}`} />;
