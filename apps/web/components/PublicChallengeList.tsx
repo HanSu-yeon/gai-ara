@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TrackedLink } from "@/components/TrackedLink";
 import { listPublicChallenges } from "@/lib/challenges";
 import { computeChallengeProgressBatch } from "@/lib/graph-service";
 import { formatChallengeListStatus } from "@/lib/distance-copy";
@@ -81,7 +82,12 @@ export function ChallengeRows({
         if (!progress) return null;
         return (
           <li key={challenge.token}>
-            <Link href={`/t/${challenge.token}`} className="public-challenge-item">
+            <TrackedLink
+              href={`/t/${challenge.token}`}
+              className="public-challenge-item"
+              event="challenge_open"
+              params={{ source: "list" }}
+            >
               <span className="public-challenge-name">
                 {challenge.displayName}
                 {challenge.isCreator && <span className="challenge-mine-chip">내가 만든</span>}
@@ -95,7 +101,7 @@ export function ChallengeRows({
               >
                 {formatChallengeListStatus(progress.status, progress.distance, challenge.participantCount)}
               </span>
-            </Link>
+            </TrackedLink>
           </li>
         );
       })}
@@ -118,9 +124,14 @@ export function PublicChallengeEntry() {
     <section className="public-challenges" aria-labelledby="public-challenges-title">
       <h2 id="public-challenges-title">이 사람까지 진짜 이어질까?</h2>
       <p className="public-challenges-lead">아는 사이가 모여 건너건너 이어져요.</p>
-      <Link href="/challenges" className="public-challenges-more">
+      <TrackedLink
+        href="/challenges"
+        className="public-challenges-more"
+        event="challenge_list_open"
+        params={{ source: "home" }}
+      >
         진행 중인 챌린지 보기 →
-      </Link>
+      </TrackedLink>
     </section>
   );
 }

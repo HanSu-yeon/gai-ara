@@ -7,6 +7,7 @@ import type { ChallengePublicInfo } from "@gai-ara/shared";
 import { BrandHeader, Centered, Character, StatusMessage } from "@/components/Brand";
 import { ChallengePathStrip } from "@/components/ChallengePathStrip";
 import { formatConnectionHeadline, formatConnectionPhrase } from "@/lib/distance-copy";
+import { trackEvent } from "@/lib/analytics";
 
 type LoadStatus = "loading" | "not-found" | "ready";
 
@@ -68,6 +69,9 @@ export default function TargetChallengeScreen() {
       } else {
         await navigator.clipboard.writeText(url);
       }
+      // 공유 시트를 닫아버린(취소) 경우는 위에서 throw되므로 여기 오지 않는다 —
+      // "공유를 눌렀다"가 아니라 "실제로 공유/복사까지 갔다"만 센다.
+      trackEvent("challenge_share", { status: info?.status ?? "unknown" });
     } catch {
       // 공유 취소 등 — 조용히 무시한다.
     } finally {
@@ -151,6 +155,7 @@ export default function TargetChallengeScreen() {
           <Link
             href={`/upload?step=form&returnTo=${encodeURIComponent(`/t/${token}`)}`}
             className="text-link text-xs mt-4"
+            onClick={() => trackEvent("challenge_contribute_click", { source: "rejoin" })}
           >
             아는 사람 더 가져오기 →
           </Link>
@@ -160,6 +165,7 @@ export default function TargetChallengeScreen() {
           <Link
             href={`/upload?step=form&returnTo=${encodeURIComponent(`/t/${token}`)}`}
             className="primary-button mt-5"
+            onClick={() => trackEvent("challenge_contribute_click", { source: "challenge" })}
           >
             나도 연결 보태기
           </Link>

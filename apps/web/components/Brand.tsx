@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { TrackedLink } from "@/components/TrackedLink";
 import { type ReactNode } from "react";
 
 export function Icon({ name, className = "" }: { name: "arrow" | "back" | "instagram" | "share" | "upload" | "link"; className?: string }) {
@@ -20,7 +21,7 @@ export function Icon({ name, className = "" }: { name: "arrow" | "back" | "insta
  * 우측을 쓰는 화면과 `/me` 자신에서는 `mine={false}`로 끈다.
  */
 export function BrandHeader({ back = false, home = false, mine = true }: { back?: boolean; home?: boolean; mine?: boolean }) {
-  return <header className={`brand-header ${back ? "center-logo" : ""}`}>{back && <Link className="back-button" href="/" aria-label="처음으로 돌아가기"><Icon name="back" /></Link>}<Link href="/" aria-label="가이 알아? 홈"><Image className="brand-logo" src="/assets/gai-ara_logo.png" width={150} height={50} priority alt="가이 알아?" /></Link>{!back && home && <Link className="small-link" href="/">처음으로<Icon name="arrow" /></Link>}{mine && !home && <Link className="small-link explore-link" href="/me">마이페이지</Link>}</header>;
+  return <header className={`brand-header ${back ? "center-logo" : ""}`}>{back && <Link className="back-button" href="/" aria-label="처음으로 돌아가기"><Icon name="back" /></Link>}<Link href="/" aria-label="가이 알아? 홈"><Image className="brand-logo" src="/assets/gai-ara_logo.png" width={150} height={50} priority alt="가이 알아?" /></Link>{!back && home && <Link className="small-link" href="/">처음으로<Icon name="arrow" /></Link>}{mine && !home && <TrackedLink className="small-link explore-link" href="/me" event="my_page_open">마이페이지</TrackedLink>}</header>;
 }
 export function Character({ kind = "wave", className = "" }: { kind?: "wave" | "search" | "heart" | "default" | "curious"; className?: string }) {
   return <Image src={`/assets/gamgyul-${kind}.png`} alt="귤 캐릭터" width={300} height={320} className={`character ${className}`} />;

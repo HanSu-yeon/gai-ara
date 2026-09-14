@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BrandHeader, Character } from "@/components/Brand";
 import { ChallengeRows } from "@/components/PublicChallengeList";
+import { TrackedLink } from "@/components/TrackedLink";
 import { listMyChallenges } from "@/lib/challenges";
 import { computeChallengeProgressBatch } from "@/lib/graph-service";
 import { isBackendConfigured } from "@/lib/env";
@@ -79,9 +80,14 @@ export default async function MyPage() {
         <Link href="/result" className="text-link text-xs">
           이어진 사람 보기 →
         </Link>
-        <Link href="/challenges" className="text-link text-xs">
+        <TrackedLink
+          href="/challenges"
+          className="text-link text-xs"
+          event="challenge_list_open"
+          params={{ source: "my_page" }}
+        >
           다른 사람들의 챌린지 구경하기 →
-        </Link>
+        </TrackedLink>
       </div>
     </main>
   );
