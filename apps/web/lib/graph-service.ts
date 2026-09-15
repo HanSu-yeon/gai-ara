@@ -325,9 +325,18 @@ async function computeChallengeReachability(
 
   const graph = prebuiltGraph ?? buildGraph(await getAllEdges());
 
-  const minDistanceFrom = (distances: ReadonlyMap<string, number>): number | null => {
+  // `excludeId`는 target 본인이 자기 챌린지의 start-set에도 들어 있을 때를
+  // 위한 방어다(2026-09-15 추가) — target이 실제로 참여자가 됐고(자기
+  // Instagram을 연동해서 그래프 노드가 됨), 궁금해서 "나도 연결 보태기"를
+  // 눌러 자기 자신을 이 챌린지의 start-set에 포함시키는 경우다. `bfsDistances`는
+  // 정의상 시작 노드 자신의 거리를 0으로 매기므로, target을 그대로 두면
+  // "target → target 자신"의 0이 최단거리로 잡혀 아무도 실제 경로를 찾지
+  // 않았는데도 "바로 아는 사이! 찾았다"가 뜬다. target 자신은 최단거리
+  // 후보에서 빼고, 그 사람을 거쳐 가는 **다른** 참여자의 실제 경로만 인정한다.
+  const minDistanceFrom = (distances: ReadonlyMap<string, number>, excludeId?: string): number | null => {
     let best: number | null = null;
     for (const startId of startSet) {
+      if (startId === excludeId) continue;
       const distance = distances.get(startId);
       if (distance === undefined) continue;
       if (best === null || distance < best) best = distance;
@@ -338,10 +347,10 @@ async function computeChallengeReachability(
   const targetParticipantId = await getParticipantIdByInstagramHash(challenge.targetInstagramUsernameHash);
   if (targetParticipantId) {
     const distances = bfsDistances(graph, targetParticipantId);
-    const minDistance = minDistanceFrom(distances);
+    const minDistance = minDistanceFrom(distances, targetParticipantId);
     if (minDistance === null) return NO_REACHABILITY;
 
-    const frontier = startSet.filter((id) => distances.get(id) === minDistance);
+    const frontier = startSet.filter((id) => id !== targetParticipantId && distances.get(id) === minDistance);
     const lastConnectorParticipantIds = findLastConnectors(graph, distances, minDistance, frontier);
     return { status: "found", distance: minDistance, lastConnectorParticipantIds };
   }

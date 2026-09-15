@@ -3,6 +3,48 @@
 제품 가설과 변경 이유, 검증 지표, 재검토 조건을 기록한다. 구현 상태만 설명하는 문서가
 아니며, 새 데이터가 쌓이면 기존 결정을 수정하거나 뒤집을 수 있다.
 
+## 2026-09-15 — target 본인의 자기 챌린지 참여로 인한 거짓 "찾았다" 방지 (구현 완료)
+
+### 상태
+
+채택, 구현 완료.
+
+### 문제
+
+target이 실제로 참여자가 되면(자기 Instagram을 연동해서 그래프 노드가 됨)
+`computeChallengeReachability`는 target 기준 BFS로 `distances`를 계산하고,
+그 챌린지의 start-set(`challenge_participants`) 각각의 거리 중 최솟값을
+찾는다. 그런데 target 본인이 궁금해서 자기 챌린지에 "나도 연결 보태기"를
+눌러 스스로 start-set에 들어가면, BFS 정의상 `distances.get(target) === 0`
+이라 이 0이 그대로 최단거리로 잡힌다. 실제로는 아무도 진짜 경로를 찾지
+않았는데 화면에는 "바로 아는 사이! 찾았다"가 뜬다 — 거짓 양성이다.
+
+(참고: "target의 친구가 참여했는데 나는 안 이어져 있어도 챌린지가
+`found`로 뜨는 것"은 이것과 다른 얘기이고 버그가 아니다 — 협업형 챌린지의
+정의 자체가 "참여자 전체 중 최단거리 1명 기준"이다. 이번 항목은 오직
+target 본인이 자기 자신을 거리 0으로 만드는 경우만 다룬다.)
+
+### 결정
+
+`computeChallengeReachability`가 target 기준 최단거리를 찾을 때, target
+자신의 participant id는 start-set 후보에서 제외한다
+(`apps/web/lib/graph-service.ts`의 `minDistanceFrom`에 `excludeId` 추가).
+target을 거쳐 가는 **다른** 참여자의 실제 경로는 그대로 인정한다 — target
+자신의 그래프상 edge를 지우는 게 아니라, "target → target 자신"이라는
+자기 자신에 대한 트리비얼한 0만 무시한다. 같은 함수를 재사용하는
+`computeViewerChallengeDistance`(뷰어 개인 거리)에도 자동으로 적용돼서,
+target 본인이 자기 챌린지를 열어봐도 스스로에게 "0다리"라는 무의미한
+숫자를 보여주지 않는다.
+
+target이 아직 참여자가 아닌 경우(external leaf 후보 분기)는 애초에
+target 자신이 그래프 노드가 아니므로 이 문제가 생기지 않는다 — 이 수정은
+target이 참여자가 된 경우에만 해당한다.
+
+### 관련 구현
+
+- `apps/web/lib/graph-service.ts`(`computeChallengeReachability`,
+  `minDistanceFrom`)
+
 ## 2026-09-15 — 홈 공개 챌린지 목록, 그리고 global start-set 제안 기각 (구현 완료)
 
 ### 상태
