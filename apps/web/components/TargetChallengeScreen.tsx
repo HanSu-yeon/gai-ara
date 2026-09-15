@@ -105,6 +105,10 @@ export default function TargetChallengeScreen() {
       // 공유 시트를 닫아버린(취소) 경우는 위에서 throw되므로 여기 오지 않는다 —
       // "공유를 눌렀다"가 아니라 "실제로 공유/복사까지 갔다"만 센다.
       trackEvent("challenge_share", { status: info?.status ?? "unknown" });
+      // 챌린지별 공유 횟수는 GA로 보내지 않고(비공개 챌린지 이름이
+      // 구글로 새어 나가지 않게) 우리 DB에만 쌓는다 — 운영자 전용 지표라
+      // 실패해도 화면에 영향을 주지 않는다(2026-09-15 결정).
+      fetch(`/api/challenges/${token}/share`, { method: "POST" }).catch(() => {});
     } catch {
       // 공유 취소 등 — 조용히 무시한다.
     } finally {

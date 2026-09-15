@@ -1,0 +1,1 @@
+ALTER TABLE "target_challenges" ADD COLUMN "share_count" integer DEFAULT 0 NOT NULL;

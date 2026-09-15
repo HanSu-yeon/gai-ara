@@ -479,6 +479,7 @@ CREATE TABLE target_challenges (
   target_instagram_username_hash text NOT NULL,
   creator_participant_id uuid NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
   is_public boolean NOT NULL DEFAULT false,      -- 2026-09-15 신규, 홈 공개 목록
+  share_count integer NOT NULL DEFAULT 0,        -- 2026-09-15 신규, 운영자 전용 지표
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX target_challenges_token_key ON target_challenges (token);
@@ -521,6 +522,18 @@ CREATE UNIQUE INDEX target_challenges_target_hash_key ON target_challenges (targ
 - 참여 현황("312명 참여")은 `challenge_participants` 행 수를 그대로 센다
   (§4.11) — 별도 집계 테이블을 만들지 않았다. 이 숫자는 장식이 아니라 그
   챌린지 탐색의 실제 start-set 크기다.
+- `share_count`: **2026-09-15 결정으로 추가**(`0015_first_psynapse.sql`).
+  "챌린지 공유하기"가 실제로 공유/복사까지 완료된 횟수 — 눌렀다고 세지
+  않고, `navigator.share`/클립보드 복사가 성공적으로 끝났을 때만 1
+  증가한다(`incrementChallengeShareCount`, `POST /api/challenges/{token}/share`).
+  **운영자 전용 지표다.** `challengePublicResultSchema`를 비롯해 어떤
+  공개 API 응답에도 이 값을 싣지 않는다 — 운영자가 SQL로 직접 조회해야만
+  볼 수 있다. GA4의 `challenge_share` 이벤트에 챌린지 식별자를 넣지 않는
+  것과 같은 이유(비공개 챌린지의 `display_name`을 구글 같은 제3자
+  서비스로 내보내지 않기 위해)로, 챌린지별 집계는 이 컬럼처럼 우리 DB
+  안에서만 쌓는다. 로그인 여부와 무관하게 증가한다 — `/t/{token}`은
+  비로그인 방문자도 열 수 있는 공개 화면이라 공유도 로그인 없이
+  일어날 수 있다.
 
 ### 4.10 `follows`에 필요한 인덱스 — 2026-09-14 (적용됨)
 

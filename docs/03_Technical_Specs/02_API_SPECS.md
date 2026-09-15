@@ -416,6 +416,16 @@ type ChallengePublicInfo = {
 // 진행 상황을 바로 돌려준다. 한 번의 업로드가 모든 챌린지에 자동 참여로
 // 이어지지는 않는다 — 참여는 항상 챌린지 단위로 명시적이다.
 type JoinChallengeResponse = { status: "searching" | "found"; distance: number | null };
+
+// POST /api/challenges/{token}/share — 로그인 불필요(2026-09-15 추가).
+// "챌린지 공유하기" 버튼이 실제로 공유/복사까지 완료됐을 때만 호출한다
+// (공유 시트를 취소하면 호출되지 않는다 — apps/web/components/
+// TargetChallengeScreen.tsx의 handleShareChallenge). target_challenges.
+// share_count를 1 증가시킬 뿐이고, 현재 카운트는 응답에 싣지 않는다 —
+// 이 숫자는 운영자 전용 지표라 화면에 보여줄 값이 아니다(01_DB_SCHEMA.md
+// §4.9의 share_count 참고). 존재하지 않는 토큰이면 조용히 아무 행도
+// 갱신하지 않는다.
+type ShareChallengeResponse = { ok: true };
 ```
 
 `instagramUsername`은 `GET`이 아니라 `POST`로만 받는다 — URL 쿼리스트링에

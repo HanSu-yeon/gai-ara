@@ -360,6 +360,16 @@ export const targetChallenges = pgTable("target_challenges", {
    * 챌린지 수가 인덱스가 필요한 규모가 되면 그때 partial index를 추가한다.
    */
   isPublic: boolean("is_public").notNull().default(false),
+  /**
+   * 2026-09-15 — "공유하기" 버튼이 실제로 공유/복사까지 완료된 횟수
+   * (운영자 전용 지표). 공개 API 응답(`challengePublicResultSchema` 등)
+   * 어디에도 이 값을 실어 보내지 않는다 — 조회수처럼 화면에 보여주는
+   * 숫자가 아니라, 운영자가 DB를 직접 봐야만 알 수 있는 내부 지표다.
+   * GA4의 `challenge_share` 이벤트가 어느 챌린지인지 식별자 없이 보내는
+   *것과 같은 이유(비공개 챌린지의 displayName을 제3자 서비스에 넘기지
+   * 않기 위해)로, 챌린지별 집계는 우리 DB에만 쌓는다.
+   */
+  shareCount: integer("share_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   tokenUnique: uniqueIndex("target_challenges_token_key").on(table.token),

@@ -232,6 +232,25 @@ export async function listMyChallenges(participantId: string): Promise<MyChallen
   }));
 }
 
+/**
+ * 2026-09-15 — "챌린지 공유하기"가 실제로 공유/복사까지 완료됐을 때
+ * `share_count`를 1 증가시킨다(운영자 전용 지표, 공개 API 응답 어디에도
+ * 노출하지 않는다 — DB를 직접 조회해야 볼 수 있다).
+ *
+ * 로그인 여부와 무관하게 호출된다 — `/t/{token}`은 비로그인 방문자도
+ * 열 수 있는 공개 화면이고 공유 버튼도 그 상태에서 눌릴 수 있으므로,
+ * participantId 없이 token만으로 갱신한다. 존재하지 않는 토큰이면
+ * 아무 행도 갱신되지 않고 조용히 끝난다(호출부가 이미 그 화면을 연
+ * 사람이므로 토큰은 사실상 항상 유효하다).
+ */
+export async function incrementChallengeShareCount(token: string): Promise<void> {
+  const db = getDb();
+  await db
+    .update(targetChallenges)
+    .set({ shareCount: sql`${targetChallenges.shareCount} + 1` })
+    .where(eq(targetChallenges.token, token));
+}
+
 /** Path Check 계산에 필요한 전체 정보(내부용) — API 응답에 그대로 내보내지 않는다. */
 export async function getChallengeByToken(token: string): Promise<ChallengeDetail | null> {
   const db = getDb();
