@@ -146,7 +146,12 @@ export default function TargetChallengeScreen() {
         <Character kind="curious" className="duo-character-flip" />
       </div>
       <h1 className="upload-heading">
-        우리 진짜 {info.displayName}까지
+        {/*
+          이름과 조사("까지")를 한 덩어리로 묶는다 — 이름이 길면
+          "김호영(뮤지컬배우) / 까지"처럼 조사만 다음 줄로 떨어져서
+          읽기 나빠진다. inline-block이면 통째로 다음 줄로 내려간다.
+        */}
+        우리 진짜 <span className="challenge-target-name">{info.displayName}까지</span>
         <br />
         닿을 수 있을까?
       </h1>

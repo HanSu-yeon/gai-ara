@@ -75,6 +75,7 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .challenges-page-list { margin-top:24px; }
 .my-challenge-list { margin-top:22px; text-align:left; }
 .my-page-links { display:flex; flex-direction:column; align-items:center; gap:12px; margin-top:30px; padding-top:20px; border-top:1.5px solid #ece5d5; }
+.challenge-target-name { display:inline-block; }
 .viewer-distance-note { display:inline-flex; align-items:center; margin-top:14px; padding:9px 16px; border-radius:99px; background:var(--color-pale-mint); color:#1e5f42; font-size:13.5px; font-weight:800; letter-spacing:-.02em; }
 .challenge-mine-chip { margin-left:7px; padding:2px 7px; border-radius:99px; background:var(--color-pale-mint); color:#1e5f42; font-size:10.5px; font-weight:800; vertical-align:2px; }
 .challenges-page-list .public-challenge-list { text-align:left; }
