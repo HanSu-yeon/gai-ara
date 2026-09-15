@@ -60,6 +60,7 @@ h1 em { color:var(--color-tangerine); font-style:normal; }
 .landing-basis { margin-top:48px; padding:18px; border-radius:20px; background:#f3f1e9; color:#777a76; word-break:keep-all; }
 .landing-basis h2 { color:var(--color-deep-green); font-family:var(--font-rounded), var(--font-sans); font-size:18px; font-weight:400; font-synthesis:none; letter-spacing:-.035em; }
 .landing-basis p { margin-top:14px; font-size:13px; line-height:1.7; }
+.landing-basis p.landing-basis-privacy-note { margin-top:10px; font-size:11px; line-height:1.6; color:#9a9d96; }
 /* `/challenges` 공개 챌린지 목록(2026-09-15). 대시보드가 아니라 발견
    영역이라 표/그리드/배지 대신 한 줄짜리 말랑한 행으로만 쓴다. */
 .public-challenge-list { display:flex; flex-direction:column; gap:8px; margin-top:14px; }

@@ -101,9 +101,21 @@ export default async function LandingPage() {
             </div>
           </div>
           <p>
-            여럿이 아는 관계를 하나씩 보태면
+            아는 사이가 모이면
             <br />
-            궁금한 사람까지 이어지는 길을 찾을 수 있어요.
+            궁금한 사람까지 건너건너 이어질 수 있어요.
+          </p>
+          {/*
+            2026-09-16 추가 — 본문보다 확실히 작고 연하게 둔다. 이 카드의
+            주장(생각보다 가까울지도 몰라요)을 방해하지 않으면서, 참여를
+            망설이게 하는 사생활 걱정을 그 자리에서 바로 풀어준다 —
+            `InstagramImportFlow.tsx`/`TargetChallengeScreen.tsx`의 같은
+            안심 문구와 짝을 이룬다.
+          */}
+          <p className="landing-basis-privacy-note">
+            🔒 건너건너 이어지는 중간 사람의 이름이나
+            <br />
+            인스타 계정은 공개되지 않아요.
           </p>
         </section>
       </section>

@@ -9,6 +9,14 @@ import { ChallengePathStrip } from "@/components/ChallengePathStrip";
 import { formatConnectionHeadline, formatConnectionPhrase } from "@/lib/distance-copy";
 import { trackEvent } from "@/lib/analytics";
 
+/**
+ * 2026-09-16 추가 — "나도 연결 보태기" 두 분기(이미 데이터가 있는 경우/
+ * 없는 경우) 모두에 "건너건너 이어지는 중간 사람의 정보는 공개되지
+ * 않아요." 안심 문구를 넣는다. `InstagramImportFlow.tsx`의 같은 결정과
+ * 짝을 이룬다 — 참여를 망설이게 하는 사생활 걱정을, 실제로 이미 지키고
+ * 있는 원칙(중간자 identity 비노출)을 보여줌으로써 줄인다.
+ */
+
 type LoadStatus = "loading" | "not-found" | "error" | "ready";
 
 /**
@@ -223,6 +231,7 @@ export default function TargetChallengeScreen() {
                 {joining ? "참여하는 중…" : "나도 연결 보태기"}
               </button>
               <p className="status-caption">이미 가져온 아는 사람들을 그대로 사용해요.</p>
+              <p className="status-caption">건너건너 이어지는 중간 사람의 정보는 공개되지 않아요.</p>
               {joinError && <p className="error-message" role="alert">{joinError}</p>}
               <Link
                 href={`/upload?step=form&returnTo=${encodeURIComponent(`/t/${token}`)}`}
@@ -242,6 +251,7 @@ export default function TargetChallengeScreen() {
                 나도 연결 보태기
               </Link>
               <p className="status-caption">서로 팔로우하는 사람만 연결에 사용해요.</p>
+              <p className="status-caption">건너건너 이어지는 중간 사람의 정보는 공개되지 않아요.</p>
             </>
           )}
           <button type="button" className="public-challenges-more mt-4" onClick={handleShareChallenge} disabled={sharing}>

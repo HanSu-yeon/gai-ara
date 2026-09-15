@@ -7,6 +7,19 @@ import { InstagramExportParseError, parseMutualsFromZip, suggestUsernameFromFile
 import { BrandHeader, Character, ConnectionSearchArt, Icon, Steps } from "@/components/Brand";
 import { trackEvent } from "@/lib/analytics";
 
+/**
+ * 2026-09-16 추가 — "인스타에서 가져오기" 화면들에 "건너건너 이어지는
+ * 중간 사람의 정보는 공개되지 않아요." 안심 문구를 넣는다. 실제로 프로덕트가
+ * 지키는 원칙(중간 연결자는 identity를 절대 노출하지 않는다,
+ * `ChallengePathStrip`/`AGENTS.md` §1 원칙 4)은 코드 주석에만 있었고, 정작
+ * 이 데이터를 넘길지 결정하는 화면에는 한 번도 보인 적이 없었다. "사생활이
+ * 걱정돼서 참여를 안 하는 사람도 있을 것"이라는 가설에서 나온 문구다 —
+ * 회원가입 화면의 "마지막 연결자가 되면 이름이 표시될 수 있어요"라는
+ * 노출 위험 경고와는 반대로, 대부분의 경우(target 바로 직전이 아닌 모든
+ * 중간 구간)는 예외 없이 안전하다는 쪽을 보여준다. 두 문구가 모순은
+ * 아니다 — "마지막 연결자"와 "중간 사람"은 이 제품에서 서로 다른 범주다.
+ */
+
 type Status = "intro" | "idle" | "parsing" | "uploading" | "success" | "error";
 
 const CHALLENGE_RETURN_TO_PATTERN = /^\/t\/([A-Za-z0-9_-]+)$/;
@@ -123,6 +136,7 @@ export function InstagramImportFlow({ startAtForm = false, returnTo = null }: { 
           인스타에서 가져오기 <Icon name="arrow" />
         </button>
         <p className="status-caption">서로 팔로우하는 사람만 연결에 사용해요.</p>
+        <p className="status-caption">건너건너 이어지는 중간 사람의 정보는 공개되지 않아요.</p>
         <Link href={returnTo ?? "/result"} className="text-link text-xs mt-4">나중에 할게요</Link>
       </main>
     );
@@ -177,6 +191,7 @@ export function InstagramImportFlow({ startAtForm = false, returnTo = null }: { 
           <br />
           사람만 찾아서 연결에 사용해요.
         </p>
+        <p className="status-caption">건너건너 이어지는 중간 사람의 정보는 공개되지 않아요.</p>
       </section>
       <form onSubmit={handleSubmit} className="upload-form">
         <label
