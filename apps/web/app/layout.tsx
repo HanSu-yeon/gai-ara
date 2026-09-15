@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import Script from "next/script";
+import { VercelAnalytics } from "@/components/VercelAnalytics";
+import { SAFE_PATH_SECTIONS } from "@/lib/safe-path";
 import "./globals.css";
 
 const jalnan = localFont({
@@ -71,8 +73,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             function gtag(){window.dataLayer.push(arguments);}
             gtag('js', new Date());
             // Only send known page categories, never tokens or query strings.
+            // The list lives in lib/safe-path.ts so GA and Vercel Analytics
+            // cannot drift apart on what is safe to send.
             var section = window.location.pathname.split('/')[1];
-            var pages = ['upload', 'result', 'r', 'pair', 'connections', 'privacy', 'preview'];
+            var pages = ${JSON.stringify(SAFE_PATH_SECTIONS)};
             var safePath = pages.includes(section) ? '/' + section : '/';
             gtag('config', '${GA_MEASUREMENT_ID}', {
               page_location: '${SITE_URL}' + safePath,
@@ -83,6 +87,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           `}
         </Script>
         <div className="brand-shell">{children}</div>
+        <VercelAnalytics />
       </body>
     </html>
   );
