@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getChallengeByToken, hasJoinedChallenge } from "@/lib/challenges";
 import { computeChallengePublicResult, computeViewerChallengeDistance } from "@/lib/graph-service";
 import { getSessionParticipantId } from "@/lib/session";
+import { getConnectionSummary } from "@/lib/participants";
 import { isBackendConfigured } from "@/lib/env";
 
 /**
@@ -43,10 +44,17 @@ export async function GET(
     ? await hasJoinedChallenge(challenge.id, viewerParticipantId)
     : false;
 
+  // 이미 관계를 보태둔 사람은 업로드를 다시 시키지 않고 바로 참여시킨다.
+  const summary = viewerParticipantId ? await getConnectionSummary(viewerParticipantId) : null;
+  const viewerHasConnections = Boolean(
+    summary && (summary.hasLinkedInstagram || summary.connectedPeople > 0),
+  );
+
   return NextResponse.json({
     displayName: challenge.displayName,
     viewerDistance,
     viewerJoined,
+    viewerHasConnections,
     ...result,
   });
 }

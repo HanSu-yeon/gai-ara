@@ -40,6 +40,8 @@ export default function TargetChallengeScreen() {
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [info, setInfo] = useState<ChallengePublicInfo | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   // 404(정말 없는 토큰)와 그 밖의 실패(서버 오류·네트워크 끊김)를 구분한다 —
   // 예전에는 전부 "존재하지 않는 챌린지예요"로 뭉뚱그려서, 잠깐의 오류가
@@ -61,6 +63,29 @@ export default function TargetChallengeScreen() {
     loadInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  /**
+   * 이미 관계를 보태둔 사람이 새 챌린지에 참여할 때 — 업로드를 다시
+   * 시키지 않고 참여만 등록한다. 참여의 의미는 "새 데이터를 낸다"가
+   * 아니라 "내가 이미 가진 trusted network를 이 챌린지의 시작점으로 써도
+   * 된다"이므로, 데이터가 이미 있으면 다시 낼 이유가 없다. 등록 직후
+   * 화면을 다시 불러와 진행 상황을 갱신한다 — 내 관계가 target까지
+   * 닿는다면 그 순간 챌린지가 풀린다.
+   */
+  async function handleJoinWithExisting() {
+    setJoining(true);
+    setJoinError(null);
+    try {
+      const response = await fetch(`/api/challenges/${token}/join`, { method: "POST" });
+      if (!response.ok) throw new Error();
+      trackEvent("challenge_join", { source: "existing_data" });
+      await loadInfo();
+    } catch {
+      setJoinError("참여하지 못했어요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setJoining(false);
+    }
+  }
 
   async function handleShareChallenge() {
     setSharing(true);
@@ -183,14 +208,38 @@ export default function TargetChallengeScreen() {
         </>
       ) : (
         <>
-          <Link
-            href={`/upload?step=form&returnTo=${encodeURIComponent(`/t/${token}`)}`}
-            className="primary-button mt-5"
-            onClick={() => trackEvent("challenge_contribute_click", { source: "challenge" })}
-          >
-            나도 연결 보태기
-          </Link>
-          <p className="status-caption">서로 팔로우하는 사람만 연결에 사용해요.</p>
+          {info.viewerHasConnections ? (
+            <>
+              <button
+                type="button"
+                className="primary-button mt-5"
+                onClick={handleJoinWithExisting}
+                disabled={joining}
+              >
+                {joining ? "참여하는 중…" : "나도 연결 보태기"}
+              </button>
+              <p className="status-caption">이미 가져온 아는 사람들을 그대로 사용해요.</p>
+              {joinError && <p className="error-message" role="alert">{joinError}</p>}
+              <Link
+                href={`/upload?step=form&returnTo=${encodeURIComponent(`/t/${token}`)}`}
+                className="text-link text-xs mt-4"
+                onClick={() => trackEvent("challenge_contribute_click", { source: "challenge_more" })}
+              >
+                인스타에서 더 가져오기 →
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href={`/upload?step=form&returnTo=${encodeURIComponent(`/t/${token}`)}`}
+                className="primary-button mt-5"
+                onClick={() => trackEvent("challenge_contribute_click", { source: "challenge" })}
+              >
+                나도 연결 보태기
+              </Link>
+              <p className="status-caption">서로 팔로우하는 사람만 연결에 사용해요.</p>
+            </>
+          )}
           <button type="button" className="public-challenges-more mt-4" onClick={handleShareChallenge} disabled={sharing}>
             {sharing ? "공유하는 중…" : "챌린지 공유하기"}
           </button>

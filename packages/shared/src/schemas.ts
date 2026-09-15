@@ -255,6 +255,20 @@ export const challengePublicInfoSchema = z.object({
    * 담지 않는다 — "나 자신이 참여했는가"라는 불리언 하나뿐이다.
    */
   viewerJoined: z.boolean(),
+  /**
+   * 이 뷰어가 이미 가이 알아?에 보탠 관계 데이터가 있는지(Instagram을 한
+   * 번이라도 연동했거나, 지인 확인으로 이어진 사람이 있는지). 비로그인이면
+   * 항상 false다.
+   *
+   * 참여는 원래 "업로드를 끝낸 순간"에만 등록됐다. 그래서 이미 맞팔을
+   * 올려둔 사람도 새 챌린지에 참여하려면 ZIP을 처음부터 다시 올려야 했다 —
+   * 참여의 의미가 "새 데이터를 낸다"가 아니라 "내가 이미 가진 관계를 이
+   * 챌린지의 시작점으로 써도 된다"인데도 그랬다. 이 값이 true면 화면은
+   * 업로드로 보내지 않고 바로 참여시킨다.
+   *
+   * 몇 명과 이어졌는지 같은 숫자는 담지 않는다 — 불리언 하나뿐이다.
+   */
+  viewerHasConnections: z.boolean(),
 }).merge(challengePublicResultSchema);
 export type ChallengePublicInfo = z.infer<typeof challengePublicInfoSchema>;
 

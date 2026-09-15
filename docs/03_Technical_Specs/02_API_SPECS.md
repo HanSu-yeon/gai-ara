@@ -405,11 +405,16 @@ type ChallengePublicInfo = {
 };
 
 // POST /api/challenges/{token}/join — 로그인 필요. "나도 연결 보태기"
-// 페이지뷰만으로는 호출되지 않는다 — 2026-09-15 협업형 챌린지 UX에서는
-// `/upload`(Instagram import)를 실제로 완료했을 때만 호출된다
-// (apps/web/components/InstagramImportFlow.tsx). 호출자를
-// challenge_participants에 upsert(멱등)하고, 갱신된 진행 상황을 바로
-// 돌려준다.
+// 페이지뷰만으로는 호출되지 않는다. 호출 경로는 두 가지다(2026-09-15 수정):
+//   1. 아직 아무 관계도 보태지 않은 사람 — `/upload`(Instagram import)를
+//      실제로 완료한 시점(apps/web/components/InstagramImportFlow.tsx).
+//   2. 이미 관계가 있는 사람(`viewerHasConnections`) — 챌린지 화면에서
+//      버튼을 누른 즉시. 업로드를 다시 시키지 않는다. 참여의 의미가
+//      "새 데이터를 낸다"가 아니라 "내가 이미 가진 trusted network를 이
+//      챌린지의 시작점으로 써도 된다"이기 때문이다.
+// 어느 쪽이든 호출자를 challenge_participants에 upsert(멱등)하고, 갱신된
+// 진행 상황을 바로 돌려준다. 한 번의 업로드가 모든 챌린지에 자동 참여로
+// 이어지지는 않는다 — 참여는 항상 챌린지 단위로 명시적이다.
 type JoinChallengeResponse = { status: "searching" | "found"; distance: number | null };
 ```
 
