@@ -9,7 +9,7 @@ import { ChallengePathStrip } from "@/components/ChallengePathStrip";
 import { formatConnectionHeadline, formatConnectionPhrase } from "@/lib/distance-copy";
 import { trackEvent } from "@/lib/analytics";
 
-type LoadStatus = "loading" | "not-found" | "ready";
+type LoadStatus = "loading" | "not-found" | "error" | "ready";
 
 /**
  * `/t/{token}` — 2026-09-15 협업형 챌린지 결정의 핵심 화면. 개인 결과
@@ -41,18 +41,21 @@ export default function TargetChallengeScreen() {
   const [info, setInfo] = useState<ChallengePublicInfo | null>(null);
   const [sharing, setSharing] = useState(false);
 
+  // 404(정말 없는 토큰)와 그 밖의 실패(서버 오류·네트워크 끊김)를 구분한다 —
+  // 예전에는 전부 "존재하지 않는 챌린지예요"로 뭉뚱그려서, 잠깐의 오류가
+  // 링크가 죽은 것처럼 보였다.
   const loadInfo = () =>
     fetch(`/api/challenges/${token}`)
       .then(async (response) => {
         if (!response.ok) {
-          setStatus("not-found");
+          setStatus(response.status === 404 ? "not-found" : "error");
           return;
         }
         const data = (await response.json()) as ChallengePublicInfo;
         setInfo(data);
         setStatus("ready");
       })
-      .catch(() => setStatus("not-found"));
+      .catch(() => setStatus("error"));
 
   useEffect(() => {
     loadInfo();
@@ -62,10 +65,15 @@ export default function TargetChallengeScreen() {
   async function handleShareChallenge() {
     setSharing(true);
     const url = `${window.location.origin}/t/${token}`;
-    const text = info ? `우리 진짜 ${info.displayName}까지 닿을 수 있을까?` : "가이 알아? 챌린지에 함께해요.";
     try {
       if (navigator.share) {
-        await navigator.share({ title: "가이 알아?", text, url });
+        // `text`를 함께 넘기지 않는다 — 데스크톱 공유 시트의 "복사"가
+        // text와 url을 합쳐서 클립보드에 넣어버리고, 그걸 주소창에 붙이면
+        // 토큰 뒤에 문장이 따라붙어 "존재하지 않는 챌린지"가 된다.
+        // 문구는 이 페이지의 OG 태그(`app/t/[token]/page.tsx`)가 이미
+        // 갖고 있어서, 링크만 보내도 카톡·메신저에서 제목·설명·이미지가
+        // 미리보기로 붙는다.
+        await navigator.share({ title: `우리 진짜 ${info?.displayName ?? ""}까지 닿을 수 있을까?`.trim(), url });
       } else {
         await navigator.clipboard.writeText(url);
       }
@@ -83,6 +91,14 @@ export default function TargetChallengeScreen() {
     return (
       <Centered character="search">
         <StatusMessage>불러오는 중…</StatusMessage>
+      </Centered>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <Centered character="search">
+        <StatusMessage>잠시 문제가 생겼어요.<br />잠시 후 다시 열어주세요.</StatusMessage>
       </Centered>
     );
   }
