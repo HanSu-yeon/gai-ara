@@ -113,7 +113,7 @@ export default async function LandingPage() {
             안심 문구와 짝을 이룬다.
           */}
           <p className="landing-basis-privacy-note">
-            🔒 건너건너 이어지는 중간 사람의 이름이나
+            건너건너 이어지는 중간 사람의 이름이나
             <br />
             인스타 계정은 공개되지 않아요.
           </p>
