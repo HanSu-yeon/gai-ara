@@ -49,41 +49,47 @@ export async function createBootstrapParticipant(): Promise<{ id: string; recove
 }
 
 /**
- * TASK-003(v2) — 카카오 로그인 콜백에서 호출한다. `(provider, providerAccountId)`로
- * 동일인을 판별한다 — 있으면 그 participantId를 그대로 돌려주고, 없으면 새
- * participants 행을 만든다. 새로 만드는 participants 행의 identityHash는
- * `createBootstrapParticipant()`와 같은 컨벤션으로 `kakao:<random hex>` opaque
- * 값을 채운다 — 매칭에는 쓰이지 않고 NOT NULL/UNIQUE 제약을 만족시키기 위한
- * 자리채움일 뿐이다(TASK-003 백로그 Implementation Preconditions 참고).
+ * TASK-003(v2), 2026-09-16 Google 추가 — OAuth 로그인 콜백에서 호출한다.
+ * `(provider, providerAccountId)`로 동일인을 판별한다 — 있으면 그
+ * participantId를 그대로 돌려주고, 없으면 새 participants 행을 만든다. 새로
+ * 만드는 participants 행의 identityHash는 `createBootstrapParticipant()`와
+ * 같은 컨벤션으로 `<provider>:<random hex>` opaque 값을 채운다 — 매칭에는
+ * 쓰이지 않고 NOT NULL/UNIQUE 제약을 만족시키기 위한 자리채움일 뿐이다
+ * (TASK-003 백로그 Implementation Preconditions 참고). 같은 사람이 카카오와
+ * Google 양쪽으로 로그인하면 서로 다른 participant가 된다 — 계정 병합은
+ * 다루지 않는다(결정 로그 2026-09-16 "로그인 제공자에 Google 추가" 참고).
  *
  * 두 로그인 요청이 거의 동시에 들어오는 race에서는 이론적으로 participants
  * 행이 중복 생성될 수 있다(oauth_accounts 유니크 제약에 걸린 쪽은 새로 만든
  * participants 행이 고아로 남는다) — `acceptInvite`/`createBootstrapParticipant`와
  * 같은 수준의 기존 제약이며, 이번 작업이 새로 만드는 리스크는 아니다.
  */
-export async function findOrCreateKakaoParticipant(providerAccountId: string): Promise<string> {
+export async function findOrCreateOAuthParticipant(
+  provider: "kakao" | "google",
+  providerAccountId: string,
+): Promise<string> {
   const db = getDb();
 
   const [existing] = await db
     .select({ participantId: oauthAccounts.participantId })
     .from(oauthAccounts)
-    .where(and(eq(oauthAccounts.provider, "kakao"), eq(oauthAccounts.providerAccountId, providerAccountId)))
+    .where(and(eq(oauthAccounts.provider, provider), eq(oauthAccounts.providerAccountId, providerAccountId)))
     .limit(1);
   if (existing) return existing.participantId;
 
   return await db.transaction(async (tx) => {
-    const identityHash = `kakao:${randomBytes(32).toString("hex")}`;
+    const identityHash = `${provider}:${randomBytes(32).toString("hex")}`;
     const recoveryToken = randomBytes(16).toString("hex");
 
     const [participant] = await tx
       .insert(participants)
       .values({ identityHash, recoveryToken })
       .returning({ id: participants.id });
-    if (!participant) throw new Error("kakao participant insert returned no row");
+    if (!participant) throw new Error(`${provider} participant insert returned no row`);
 
     const [inserted] = await tx
       .insert(oauthAccounts)
-      .values({ participantId: participant.id, provider: "kakao", providerAccountId })
+      .values({ participantId: participant.id, provider, providerAccountId })
       .onConflictDoNothing()
       .returning({ participantId: oauthAccounts.participantId });
     if (inserted) return inserted.participantId;
@@ -92,7 +98,7 @@ export async function findOrCreateKakaoParticipant(providerAccountId: string): P
     const [winner] = await tx
       .select({ participantId: oauthAccounts.participantId })
       .from(oauthAccounts)
-      .where(and(eq(oauthAccounts.provider, "kakao"), eq(oauthAccounts.providerAccountId, providerAccountId)))
+      .where(and(eq(oauthAccounts.provider, provider), eq(oauthAccounts.providerAccountId, providerAccountId)))
       .limit(1);
     if (!winner) throw new Error("oauth account conflict but no winning row found");
     return winner.participantId;

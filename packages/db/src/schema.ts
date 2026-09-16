@@ -77,12 +77,15 @@ export const participants = pgTable("participants", {
 }));
 
 /**
- * TASK-003(v2) — 카카오 로그인으로 동일 사용자를 판별하는 조인 테이블.
- * `(provider, providerAccountId)`가 실제 동일인 판정의 근거다 —
- * `participants.identityHash`는 카카오 참여자에게는 `kakao:<random hex>`
- * 자리채움 값일 뿐 매칭에 쓰이지 않는다(apps/web/lib/participants.ts의
- * `findOrCreateKakaoParticipant` 참고). provider는 지금은 'kakao' 고정값
- * 하나뿐이다(결정 로그 2026-09-13 항목 7 — 다른 제공자는 추가하지 않음).
+ * TASK-003(v2), 2026-09-16 Google 추가 — OAuth 로그인으로 동일 사용자를
+ * 판별하는 조인 테이블. `(provider, providerAccountId)`가 실제 동일인 판정의
+ * 근거다 — `participants.identityHash`는 OAuth 참여자에게는
+ * `<provider>:<random hex>` 자리채움 값일 뿐 매칭에 쓰이지 않는다
+ * (apps/web/lib/participants.ts의 `findOrCreateOAuthParticipant` 참고).
+ * provider는 'kakao' 또는 'google'이다(결정 로그 2026-09-16 "로그인 제공자에
+ * Google 추가" — 2026-09-13 항목 7의 카카오 단일 제공자 결정을 재검토 조건
+ * 충족으로 갱신함). 같은 사람이 두 provider로 각각 로그인하면 서로 다른
+ * participant가 되며, 계정 병합은 다루지 않는다.
  */
 export const oauthAccounts = pgTable("oauth_accounts", {
   id: uuid("id").defaultRandom().primaryKey(),

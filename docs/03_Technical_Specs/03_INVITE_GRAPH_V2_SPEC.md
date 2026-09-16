@@ -183,13 +183,31 @@ JOIN acquaintance_links al ON al.id = ac.link_id
   개인화된 문구를 쓸 수 있게 한다. 이 링크를 여는 것만으로는 여전히 어떤 edge도
   생기지 않는다.
 
-## 4. 카카오 단일 제공자 결정
+## 4. 로그인 제공자: 카카오 + Google (2026-09-16 갱신)
 
-로그인 제공자는 카카오만 둔다. 카카오는 사실상 한국에서만 쓰여서, 이 하나로
-좁히는 것 자체가 콜드 스타트 전략(전 세계가 아니라 한 국가·커뮤니티에서 먼저
-밀도를 만드는 것)과 맞고, OAuth 연동을 하나만 구현하면 되는 이점도 있다. 해외
-확장이 실제로 필요해지기 전까지는 다른 제공자를 추가하지 않는다(결정 로그
-재검토 조건).
+로그인 제공자는 원래 카카오만 뒀다. 카카오는 사실상 한국에서만 쓰여서, 이
+하나로 좁히는 것 자체가 콜드 스타트 전략(전 세계가 아니라 한 국가·커뮤니티에서
+먼저 밀도를 만드는 것)과 맞았고, OAuth 연동을 하나만 구현하면 되는 이점도
+있었다. 2026-09-16 해외 확장이 실제 목표로 확정되어 재검토 조건이 충족됐다
+(결정 로그의 2026-09-16 "로그인 제공자에 Google 추가" 항목).
+
+- Auth.js `authOptions`(`apps/web/lib/auth.ts`)에 `KakaoProvider`와 나란히
+  `GoogleProvider`를 추가한다. `signIn` 콜백은 `account.provider`가
+  `"kakao"` 또는 `"google"`일 때만 통과시킨다.
+- `oauth_accounts` 테이블(`provider` + `provider_account_id` 복합 유니크
+  인덱스, `packages/db/src/schema.ts`)은 이미 provider-agnostic하므로
+  마이그레이션 없이 `provider = "google"` 행을 그대로 쓸 수 있다.
+- `findOrCreateKakaoParticipant`(`apps/web/lib/participants.ts`)와 같은
+  패턴으로 Google 전용 조회/생성 함수를 추가한다. `participants.identity_hash`는
+  카카오와 동일하게 매칭에 쓰이지 않는 opaque 자리채움 값(`google:<random hex>`)을
+  넣는다 — 실제 동일인 판별의 조인 키는 `oauth_accounts(provider,
+  provider_account_id)`다.
+- 동일 인물이 카카오와 Google 양쪽으로 각각 로그인하면 서로 다른
+  participant로 취급한다. 계정 병합은 이번 범위 밖이다.
+- 환경 변수 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`을 추가하고,
+  `isGoogleAuthConfigured()`를 `isKakaoAuthConfigured()`(`apps/web/lib/env.ts`)와
+  같은 패턴으로 추가해 설정이 없으면 해당 provider만 503으로 비활성화한다
+  (카카오 설정이 없다고 Google까지 막지 않는다).
 
 ## 5. 미해결 사항
 
@@ -200,7 +218,8 @@ JOIN acquaintance_links al ON al.id = ac.link_id
 
 ## 6. Related Documents
 
-- [제품 결정](../01_Concept_Design/00_PRODUCT_DECISION_LOG.md) — 2026-09-13 항목
+- [제품 결정](../01_Concept_Design/00_PRODUCT_DECISION_LOG.md) — 2026-09-13 항목,
+  2026-09-16 "로그인 제공자에 Google 추가" 항목
 - [화면 스토리보드](../02_UI_Screens/02_INVITE_GRAPH_CONCEPT.md)
 - [기존 DB 스키마](./01_DB_SCHEMA.md) — TASK-002까지의 기준, 참고용
 - [기존 API 명세](./02_API_SPECS.md) — Instagram/1회용 토큰 흐름, 참고용
