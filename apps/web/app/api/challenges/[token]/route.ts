@@ -13,8 +13,10 @@ import { isBackendConfigured } from "@/lib/env";
  * 추가 결정으로 "마지막 연결자" 요약(개수 + 공개 동의한 사람의 닉네임
  * 최대 3명)도 포함한다 — `computeChallengePublicResult`가 동의하지
  * 않은 participant의 displayName/participantId는 이미 걸러낸 뒤 돌려주므로
- * 여기서는 그대로 응답에 실어 보내면 된다. 대상의 Instagram 해시, 만든
- * 사람의 신원, start-set/중간 노드 participant 목록은 절대 포함하지
+ * 여기서는 그대로 응답에 실어 보내면 된다. 2026-09-19 결정으로 마스킹된
+ * Instagram username 표시값(`targetInstagramUsernameMasked`)도 함께
+ * 내려준다 — 대상의 raw username과 해시(targetInstagramUsernameHash),
+ * 만든 사람의 신원, start-set/중간 노드 participant 목록은 절대 포함하지
  * 않는다.
  */
 export async function GET(
@@ -43,6 +45,9 @@ export async function GET(
   const viewerJoined = viewerParticipantId
     ? await hasJoinedChallenge(challenge.id, viewerParticipantId)
     : false;
+  const viewerIsCreator = viewerParticipantId
+    ? challenge.creatorParticipantId === viewerParticipantId
+    : false;
 
   // 이미 관계를 보태둔 사람은 업로드를 다시 시키지 않고 바로 참여시킨다.
   const summary = viewerParticipantId ? await getConnectionSummary(viewerParticipantId) : null;
@@ -52,9 +57,11 @@ export async function GET(
 
   return NextResponse.json({
     displayName: challenge.displayName,
+    targetInstagramUsernameMasked: challenge.targetInstagramUsernameMasked,
     viewerDistance,
     viewerJoined,
     viewerHasConnections,
+    viewerIsCreator,
     ...result,
   });
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "target_challenges" ADD COLUMN "target_instagram_username_masked" text;

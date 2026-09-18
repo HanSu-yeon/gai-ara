@@ -2,6 +2,237 @@
 > Created: 2026-09-13 00:00
 > Last Updated: 2026-09-13 00:00
 
+## TASK-012 — `/challenges` 목록 UI 정리 + 공개 요청 문의 도입
+- Work Type: code
+- 요청 배경(사용자 지정): "챌린지 항상 공개"를 요청했으나, 일반인 대상
+  챌린지를 무조건 공개 목록에 올리는 건 AGENTS.md §1 원칙 3(사람을 찾아내는
+  디렉터리 금지)과 정면 충돌해 Coordinator가 반려했다. 대신 사용자가 절충안을
+  제시: 공개를 원하면 운영자에게 문의하도록 안내한다. 별도로 목록 가독성
+  개선(글씨 크기, 대상 이름 말줄임)과 목록이 길어질 때의 "더보기"도 요청했다.
+- Scope:
+  - `/challenges` "더보기": 새 API 라우트 없이 `?limit=N` 쿼리로 서버
+    컴포넌트를 다시 렌더링하는 방식(무한스크롤 아님, 클릭으로만 증가).
+  - 목록 행 글씨 크기 축소, 대상 이름이 길면 `...`로 말줄임(상세 페이지
+    `/t/{token}`에서는 전체 이름 그대로 보임 — 그 화면은 원래 안 잘랐다).
+  - `/t/{token}`에 "공개 목록에 올리고 싶으면 문의하기" mailto 링크를
+    **챌린지를 만든 사람에게만** 보여준다(다른 참여자가 남의 챌린지 공개를
+    대신 요청하는 통로를 만들지 않기 위해). 실제 공개 전환은 여전히 운영자가
+    `is_public`을 직접 SQL로 켜는 수동 검토로만 이뤄진다 — 자동 공개 경로는
+    추가하지 않았다.
+- Implementation Preconditions:
+  - `packages/shared/src/schemas.ts`의 `challengePublicInfoSchema`에
+    `viewerIsCreator: boolean`만 추가한다 — 다른 뷰어에게 만든 사람의
+    신원을 노출하지 않는다.
+  - `apps/web/app/api/challenges/[token]/route.ts`가 세션 participantId와
+    `challenge.creatorParticipantId`를 비교해 `viewerIsCreator`를 계산한다.
+  - `apps/web/components/PublicChallengeList.tsx`가 `limit+1`행을 조회해
+    "더보기" 필요 여부만 판단하고 실제로는 `limit`개만 렌더링한다.
+  - `apps/web/app/challenges/page.tsx`의 `limit` 쿼리는 페이지 크기(12)의
+    배수로 클램프한다(임의로 큰 값을 넣어 한 번에 긁어가는 것 방지).
+  - `RequestPublicListing`(`TargetChallengeScreen.tsx`)은 `viewerIsCreator`가
+    false면 아무것도 렌더링하지 않는다.
+- Context Receipt:
+  - Status: PASS
+  - Required References Read: Coordinator가 `apps/web/app/challenges/page.tsx`,
+    `apps/web/components/PublicChallengeList.tsx`,
+    `apps/web/components/TargetChallengeScreen.tsx`,
+    `apps/web/app/api/challenges/[token]/route.ts`,
+    `apps/web/lib/challenges.ts`(`listPublicChallenges`/`ChallengeDetail`),
+    `packages/shared/src/schemas.ts`, `apps/web/app/me/page.tsx`(공유 컴포넌트
+    영향 확인), `apps/web/app/privacy/page.tsx`(기존 mailto 패턴)를 직접
+    읽었다(2026-09-19). 백로그 항목 자체는 이 작업 직후 추가.
+  - Constraints: `AGENTS.md` §1 원칙 3(디렉터리·무한스크롤·목록 API 금지).
+    "이 목록을 내보내는 공개 API 라우트도 만들지 않는다"(2026-09-15 결정).
+  - Conflicts: "항상 공개" 요청 자체가 원칙과 충돌 → Coordinator가 반려하고
+    사용자가 문의 기반 절충안으로 대체. 그 외 충돌 없음.
+- Acceptance Criteria:
+  - `/challenges?limit=N`으로 서버 컴포넌트가 다시 렌더링되고, 더 있으면
+    "더보기" 링크가 다음 배수로 이동한다. 새 API 라우트가 생기지 않는다.
+  - 목록 행 글씨가 이전보다 작고, 이름이 길면 `...`로 잘린다.
+  - `/t/{token}`에서 만든 사람에게만 "공개 목록에 올리고 싶다면 문의하기"
+    mailto 링크가 보인다(비로그인/타인 조회 시 확인 — 브라우저로 실제 확인).
+  - `pnpm typecheck` PASS.
+- Document Sync Check: 별도 결정 로그 항목은 만들지 않는다 — "공개 기본값
+  false" 원칙 자체는 바뀌지 않았고, 이번 변경은 그 원칙 위에 문의 도입선을
+  하나 얹은 것뿐이라 기존 2026-09-15/09-19 항목의 취지를 벗어나지 않는다.
+- Change Receipt:
+  - Files Changed: `packages/shared/src/schemas.ts`,
+    `apps/web/app/api/challenges/[token]/route.ts`,
+    `apps/web/components/TargetChallengeScreen.tsx`,
+    `apps/web/components/PublicChallengeList.tsx`,
+    `apps/web/app/challenges/page.tsx`, `apps/web/app/globals.css`.
+  - Requirements Covered: 위 Acceptance Criteria 전체.
+  - Excluded Scope: "챌린지 항상 공개"(반려), `/me` 페이지 자체 로직 변경
+    없음(공유 CSS/컴포넌트 영향만 받음), 새 API 라우트, 무한스크롤.
+  - Basic Checks: `pnpm typecheck`(워크스페이스 전체) - PASS.
+  - Remaining Risks: 현재 운영 DB에 공개 챌린지가 3건뿐이라 "더보기"가
+    실제로 나타나는 경우를 브라우저에서 직접 보지는 못했다(로직은
+    `limit+1` 조회로 코드 리뷰 및 소규모 데이터로 검증). 챌린지 수가 늘면
+    한 번 더 확인이 필요하다.
+- Verification Receipt:
+  - Status: PASS(제한적)
+  - Commands and Results: `pnpm typecheck`(워크스페이스 전체) - PASS.
+    로컬 서버(`gai-ara-web`)에서 `/challenges`, `/t/{token}`(부승관) 실제
+    렌더링 확인 - PASS(글씨 크기 축소, masked username `@ple****os` 표시
+    확인). 비로그인 상태라 `RequestPublicListing`은 렌더링되지 않음을
+    확인(예상대로 — 로그인·생성자 세션으로는 추가 확인 필요).
+  - Unrun Checks: "더보기" 버튼이 실제로 나타나는 경로(공개 챌린지 13개
+    이상)와 생성자 로그인 세션에서의 mailto 링크 노출은 데이터/세션 제약으로
+    미확인 — 코드 리뷰로만 검증.
+
+## TASK-011 — 타겟 챌린지: masked Instagram username 공개 표시
+- Work Type: code
+- 요청 배경(사용자 지정): 챌린지 생성자 본인도 "내가 등록해도 진짜 그 사람이
+  맞는지 헷갈린다"는 문제가 있었고, 이어서 챌린지 참여자도 `/t/{token}`에서
+  "내가 생각하는 그 사람을 대상으로 한 챌린지가 맞는지" 확인할 수 있어야
+  한다는 요구로 범위가 확장됐다. Raw Instagram username을 저장하지 않는다는
+  기존 원칙(AGENTS.md §1 원칙 2)은 그대로 유지하면서, 마스킹된 표시용 값만
+  별도로 저장·노출하는 것으로 절충하기로 사용자가 직접 결정했다.
+- Scope: `target_challenges`에 마스킹 표시용 컬럼 추가, 챌린지 생성 시 계산·
+  저장, `GET /api/challenges/{token}` 공개 응답에 masked 값만 노출,
+  `/t/[token]` 화면에 표시. `/create` 입력 화면, 그래프 계산
+  (`getAllEdges`/`computeChallengeProgress`), `challenge_participants`
+  start-set, `POST /api/challenges/{token}/join` 응답, Instagram mutual
+  matching 로직은 변경하지 않는다.
+- Related Concept Docs: [Product decisions](../01_Concept_Design/00_PRODUCT_DECISION_LOG.md)
+  신규 항목(이번 작업에서 추가)
+- Related Technical Docs: [DB Schema](../03_Technical_Specs/01_DB_SCHEMA.md) §4.9,
+  [API Specs](../03_Technical_Specs/02_API_SPECS.md) §8.2,
+  [개발 원칙](../03_Technical_Specs/00_DEVELOPMENT_PRINCIPLES.md) §3 원칙 2·3
+- Related QA Docs: N/A - 구현 후 작성
+- Implementation Preconditions:
+  - DB: `target_challenges.target_instagram_username_masked` (nullable text,
+    unique 제약 없음) 컬럼을 `packages/db/src/schema.ts`에 추가하고
+    `pnpm db:generate`로 마이그레이션을 생성한다(수기 작성 금지). 기존 row는
+    NULL로 남는다 — 과거 해시로부터 복원 시도를 하지 않는다.
+  - 생성 로직: `apps/web/lib/instagram-identity.ts`에
+    `maskInstagramUsername(normalizedUsername)` 순수 함수를 추가한다.
+    `normalizeUsername`(트림·`@`제거·소문자화, `@gai-ara/ig-parser`)으로 정규화한
+    뒤에만 마스킹한다. 규칙: 길이 3 이하는 첫 1글자+고정 마스크, 4~6은 첫
+    2글자, 7~9는 첫 2글자+끝 1글자, 10 이상은 첫 3글자+끝 2글자(예:
+    `pledis_boos` → `ple****os`) — 가운데는 실제 길이와 무관하게 항상 고정
+    개수의 `*`로 표시해 길이를 유추할 수 없게 한다. 노출 글자 수가 전체 길이의
+    절반을 넘지 않게 한다. 표시할 때는 `@` 접두사를 붙인다.
+  - `POST /api/challenges`(`apps/web/app/api/challenges/route.ts`)가 해시와
+    함께 masked 값도 계산해 `createChallenge`(`apps/web/lib/challenges.ts`)에
+    전달·저장한다. 중복 생성 응답(`createChallengeResultSchema`)에는 masked
+    값을 추가하지 않는다(스펙에 없는 범위, YAGNI).
+  - `getChallengeByToken`(`apps/web/lib/challenges.ts`)이 masked 컬럼을 함께
+    조회해 `ChallengeDetail`에 포함한다.
+  - `packages/shared/src/schemas.ts`의 `challengePublicInfoSchema`에
+    `targetInstagramUsernameMasked: z.string().nullable()`을 추가한다.
+    `challengePublicResultSchema`/`challengeProgressSchema`(join 응답과 공유)는
+    건드리지 않는다 — join 엔드포인트 응답에 username 관련 필드가 새지
+    않아야 한다.
+  - `GET /api/challenges/{token}`(`apps/web/app/api/challenges/[token]/route.ts`)
+    응답에 masked 값을 포함한다. raw username과 해시는 어떤 응답에도 절대
+    포함하지 않는다.
+  - `/t/[token]` UI(`apps/web/components/TargetChallengeScreen.tsx`,
+    "found"·"searching" 두 분기 모두)에서 `displayName` 바로 아래 masked
+    username을 작은 회색 텍스트로 단독 표시한다("Instagram ·" 같은 접두 설명
+    문구 없이 `@ple****os`만, 사용자 지정). masked 값이 null(과거 챌린지)이면
+    이 영역 자체를 렌더링하지 않는다.
+  - masked 값은 UI 표시 전용이며 identity matching/조회에 절대 사용하지
+    않는다. username 검색·lookup API, masked username 기반 챌린지 검색
+    기능은 만들지 않는다.
+  - `maskInstagramUsername`에 대해 길이 1~3, 4~6, 7~9, 10 이상 경계값과
+    실제 예시(`pledis_boos`)를 포함한 테스트를 `apps/web/lib/` 관행(co-located
+    `*.test.ts`, `node:test`)대로 추가한다.
+  - 이번 작업 범위 밖의 리팩터링은 하지 않는다.
+- Context Receipt:
+  - Status: PASS
+  - Required References Read: Coordinator가 `packages/db/src/schema.ts`
+    (`targetChallenges` 345-380), `packages/db/drizzle.config.ts`,
+    `packages/db/migrations/`(네이밍 컨벤션), `apps/web/app/api/challenges/route.ts`,
+    `apps/web/lib/instagram-identity.ts`, `packages/ig-parser/src/normalize.ts`,
+    `apps/web/lib/challenges.ts`(`createChallenge`/`getChallengeByTargetHash`/
+    `getChallengeByToken`), `apps/web/app/api/challenges/[token]/route.ts`,
+    `apps/web/app/api/challenges/[token]/join/route.ts`,
+    `packages/shared/src/schemas.ts`(challenge 관련 스키마),
+    `apps/web/components/TargetChallengeScreen.tsx`,
+    `apps/web/app/t/[token]/page.tsx`(OG 메타에는 추가하지 않음 확인),
+    `docs/01_Concept_Design/00_PRODUCT_DECISION_LOG.md`(항목 포맷),
+    `docs/03_Technical_Specs/02_API_SPECS.md` §8,
+    `docs/03_Technical_Specs/01_DB_SCHEMA.md` §4.9,
+    `docs/03_Technical_Specs/00_DEVELOPMENT_PRINCIPLES.md` §3, `AGENTS.md` §1을
+    `solmate-context-reader` 서브에이전트를 통해 읽었다(2026-09-19).
+  - Constraints: 위 Implementation Preconditions 전체. `AGENTS.md` §1 원칙 2·3
+    (평문 미저장, 외부 계정 탐색/검색 API 금지).
+  - Conflicts: 초기에 백로그 항목 자체가 없어 Context Receipt가 BLOCKED였다 →
+    이 TASK-011 항목을 추가해 해결. `POST /api/challenges` 중복 응답에도
+    masked 값을 넣을지는 스펙 밖 질문으로 남아있었다 → Excluded Scope로
+    명시해 해결(필요해지면 별도 태스크).
+- Acceptance Criteria:
+  - `target_challenges`에 nullable masked 컬럼이 존재하고 마이그레이션이
+    `pnpm db:generate`로 생성됐다.
+  - 새 챌린지 생성 시 masked 값이 저장된다. 예시 입력(`pledis_boos`)에 대해
+    `ple****os`가 계산된다.
+  - `GET /api/challenges/{token}` 응답에 masked 값이 포함되고, raw
+    username/hash는 어떤 응답 바디에도 없다(join 응답 포함해 grep으로 확인).
+  - `/t/{token}`에서 displayName 아래 `@ple****os` 형태만(접두 설명 없이)
+    작은 회색 텍스트로 보인다. masked 값이 null인 기존 챌린지는 이 영역이
+    렌더링되지 않는다.
+  - `maskInstagramUsername` 경계값 테스트가 통과한다.
+  - `pnpm typecheck` PASS.
+- Document Sync Check: `docs/01_Concept_Design/00_PRODUCT_DECISION_LOG.md`에
+  이번 결정을 기존 항목 포맷대로 새 항목으로 추가(2026-09-16 항목 위에
+  prepend)한다. `docs/03_Technical_Specs/02_API_SPECS.md` §8.2의
+  `ChallengePublicInfo` 타입 블록에 masked 필드를 추가한다.
+  `docs/03_Technical_Specs/01_DB_SCHEMA.md` §4.9에 새 컬럼을 문서화한다.
+- Internal CLI: 이전 태스크들과 동일하게 체크박스 없는 헤딩 형식 때문에
+  `solmate-skills preflight`가 인식하지 못한다 — 독립 Receipt로 대체.
+- Change Receipt:
+  - Files Changed:
+    - `packages/db/src/schema.ts` — `targetChallenges.targetInstagramUsernameMasked` 컬럼 추가
+    - `packages/db/migrations/0016_youthful_microchip.sql` — `pnpm db:generate`로 생성, DB에 적용 완료
+    - `apps/web/lib/instagram-identity.ts` — `maskInstagramUsername` 추가
+    - `apps/web/lib/instagram-identity.test.ts` — 경계값(1~3/4~6/7~9/10+) + `pledis_boos` 예시 테스트(신규)
+    - `apps/web/app/api/challenges/route.ts` — 생성 시 masked 값 계산·전달
+    - `apps/web/lib/challenges.ts` — `createChallenge` 시그니처 확장, `getChallengeByToken`/`ChallengeDetail`에 포함
+    - `packages/shared/src/schemas.ts` — `challengePublicInfoSchema`에 `targetInstagramUsernameMasked` 추가
+    - `apps/web/app/api/challenges/[token]/route.ts` — 공개 응답에 masked 값 포함
+    - `apps/web/components/TargetChallengeScreen.tsx` — `TargetMaskedUsername` 추가, found/searching 두 분기에 표시
+    - `apps/web/app/globals.css` — `.target-masked-username` 스타일 추가
+    - `docs/01_Concept_Design/00_PRODUCT_DECISION_LOG.md` — 2026-09-19 항목 추가
+    - `docs/03_Technical_Specs/02_API_SPECS.md` §8.2 — `ChallengePublicInfo`에 필드 추가
+    - `docs/03_Technical_Specs/01_DB_SCHEMA.md` §4.9 — 새 컬럼 문서화
+    - (스코프 밖, 필요 최소 수정) `packages/ig-parser/src/index.ts`,
+      `packages/ig-parser/src/mutuals.ts`, `packages/ig-parser/src/zip.ts`,
+      `packages/ig-parser/tsconfig.json` — 상대 import에 `.ts` 확장자를
+      명시하지 않아 Node 내장 테스트 러너(`node --test`)가 barrel(`index.ts`)을
+      거쳐 이 패키지를 import하는 모든 코드에서 `ERR_MODULE_NOT_FOUND`로
+      깨지는 기존 버그를 발견 — 이번 태스크의 신규 테스트
+      (`instagram-identity.test.ts`)가 `@gai-ara/ig-parser`를 처음으로
+      가져오면서 드러났다. 동작 변경 없이 확장자만 명시(`tsconfig.json`에
+      `allowImportingTsExtensions` 추가, `apps/web/tsconfig.json`과 동일
+      패턴)해 해결했다.
+  - Requirements Covered: 위 Acceptance Criteria 전체(DB 컬럼·마이그레이션,
+    생성 시 저장, 공개 응답 노출 + raw/hash 비노출, `/t/{token}` UI 표시,
+    경계값 테스트, `pnpm typecheck` PASS).
+  - Excluded Scope: `/create` 입력 화면, 그래프 계산
+    (`getAllEdges`/`computeChallengeProgress`), `challenge_participants`,
+    `POST /api/challenges/{token}/join` 응답, `getChallengeByTargetHash`
+    (중복 생성 감지 경로) — 전부 손대지 않음. `apps/web/AGENTS.md`도
+    사용자 지시대로 건드리지 않음.
+  - Basic Checks:
+    - `pnpm db:generate` - PASS - `0016_youthful_microchip.sql`(nullable
+      `ADD COLUMN`, unique 제약 없음) 생성
+    - `pnpm db:migrate` - PASS - 실제 DB에 적용, `information_schema.columns`로
+      컬럼 존재·nullable 확인
+    - `pnpm typecheck`(워크스페이스 전체) - PASS
+    - `pnpm --filter @gai-ara/web test` - PASS - 12개 전체(신규
+      `maskInstagramUsername` 4개 포함)
+    - `pnpm --filter @gai-ara/ig-parser test` - PASS - 15개(회귀 없음 확인)
+    - `grep`으로 `targetInstagramUsernameHash`/raw `instagramUsername`이
+      API 응답 조립부(`NextResponse.json`)에 등장하지 않음을 확인 - PASS
+  - Remaining Risks: `packages/shared`의 `pnpm -r test`가 이번 작업과
+    무관하게 "No test files found"로 이미 실패 상태였다(해당 패키지에
+    테스트 파일 자체가 없음) — 기존 상태이고 이번 변경과 무관해 손대지
+    않았다. DB 마이그레이션은 로컬 `.env.local`이 가리키는 Neon 브랜치에
+    적용했는데, 이 브랜치가 dev/prod 공유 상태라는 별도 인프라 이슈가
+    남아있다(MEMORY 기록) — 추가한 컬럼은 nullable이라 기존 행에 영향
+    없음.
+
 ## TASK-010 — 화면 10(연결 미발견) 카피·CTA·일러스트 개정
 - Work Type: code
 - Scope: `apps/web/components/ReferralLanding.tsx`의 `result.status ===

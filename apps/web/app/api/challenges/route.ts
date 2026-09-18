@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { normalizeUsername } from "@gai-ara/ig-parser";
 import { createChallengeSchema } from "@gai-ara/shared";
-import { hashInstagramUsername } from "@/lib/instagram-identity";
+import { hashInstagramUsername, maskInstagramUsername } from "@/lib/instagram-identity";
 import { createChallenge } from "@/lib/challenges";
 import { checkChallengeCreateRateLimit } from "@/lib/rate-limit";
 import { getSessionParticipantId } from "@/lib/session";
@@ -9,9 +10,10 @@ import { isBackendConfigured } from "@/lib/env";
 /**
  * 2026-09-14 타겟 챌린지 생성, 2026-09-15 협업형 챌린지 결정 — 생성자는
  * `createChallenge` 안에서 같은 트랜잭션으로 첫 참여자로 upsert된다.
- * `instagramUsername` 원문은 해싱 직후 버려진다(서버 로그·응답에 절대
- * 포함하지 않는다). target을 "연예인"으로 한정하지 않는다 — 사용자가
- * 궁금한 사람이면 누구든 지정할 수 있다.
+ * `instagramUsername` 원문은 해시(`hashInstagramUsername`)와 마스킹된
+ * 표시용 값(`maskInstagramUsername`, 2026-09-19 추가) 계산 직후
+ * 버려진다(서버 로그·응답에 절대 포함하지 않는다). target을 "연예인"으로
+ * 한정하지 않는다 — 사용자가 궁금한 사람이면 누구든 지정할 수 있다.
  *
  * `02_API_SPECS.md` §8.6이 설계한 `participantId` 기준 rate limit(분당
  * 5회/시간당 30회)을 그대로 구현한다 — 반복 생성이 사실상 무제한 조회
@@ -51,7 +53,8 @@ export async function POST(request: NextRequest) {
 
   const { displayName, instagramUsername } = parsed.data;
   const targetHash = hashInstagramUsername(instagramUsername);
-  const challenge = await createChallenge(participantId, displayName, targetHash);
+  const targetMasked = maskInstagramUsername(normalizeUsername(instagramUsername));
+  const challenge = await createChallenge(participantId, displayName, targetHash, targetMasked);
 
   return NextResponse.json(challenge);
 }

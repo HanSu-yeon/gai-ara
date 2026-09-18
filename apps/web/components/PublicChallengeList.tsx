@@ -32,18 +32,26 @@ import { formatChallengeListStatus } from "@/lib/distance-copy";
  * 보여준다. 한 줄에 이름 + 상태 한 마디뿐이다 — 상태는 "N명 참여 · 찾는 중"과
  * "N다리 발견" 두 가지만 쓴다(원래 지시 §11). 항목 전체를 누르면 기존
  * `/t/{token}`으로 가고, 거기서 기존 "나도 연결 보태기" 플로우를 그대로 쓴다.
+ *
+ * 2026-09-19 추가 — 목록이 길어지면 "더보기" 클릭으로 다음 묶음을 이어서
+ * 보여준다(무한스크롤은 아니다 — `AGENTS.md` §1 원칙 3이 무한스크롤을
+ * 명시적으로 금지한다, 클릭으로만 늘어난다). 새 API 라우트를 만들지 않고
+ * `/challenges?limit=N`의 `limit` 쿼리로 이 서버 컴포넌트를 다시 렌더링하는
+ * 방식이라(`app/challenges/page.tsx`) "이 목록을 내보내는 공개 API 라우트도
+ * 만들지 않는다"는 원칙을 그대로 지킨다.
  */
-export async function PublicChallengeList() {
-  let challenges: Awaited<ReturnType<typeof listPublicChallenges>>;
-  let progresses: Awaited<ReturnType<typeof computeChallengeProgressBatch>>;
+export const CHALLENGE_LIST_PAGE_SIZE = 12;
+
+export async function PublicChallengeList({ limit = CHALLENGE_LIST_PAGE_SIZE }: { limit?: number }) {
+  let rows: Awaited<ReturnType<typeof listPublicChallenges>>;
   try {
-    challenges = await listPublicChallenges();
-    progresses = await computeChallengeProgressBatch(challenges);
+    // 실제로 더 있는지 알기 위해 한 개 더 가져와서 확인만 하고 버린다.
+    rows = await listPublicChallenges(limit + 1);
   } catch {
     return <p className="status-caption">목록을 불러오지 못했어요. 잠시 후 다시 열어주세요.</p>;
   }
 
-  if (challenges.length === 0) {
+  if (rows.length === 0) {
     return (
       <p className="status-caption">
         아직 공개된 챌린지가 없어요.
@@ -53,7 +61,20 @@ export async function PublicChallengeList() {
     );
   }
 
-  return <ChallengeRows challenges={challenges} progresses={progresses} />;
+  const hasMore = rows.length > limit;
+  const challenges = hasMore ? rows.slice(0, limit) : rows;
+  const progresses = await computeChallengeProgressBatch(challenges);
+
+  return (
+    <>
+      <ChallengeRows challenges={challenges} progresses={progresses} />
+      {hasMore && (
+        <Link href={`/challenges?limit=${limit + CHALLENGE_LIST_PAGE_SIZE}`} className="public-challenges-more mt-4">
+          더보기
+        </Link>
+      )}
+    </>
+  );
 }
 
 /**
@@ -69,6 +90,7 @@ export function ChallengeRows({
   challenges: ReadonlyArray<{
     token: string;
     displayName: string;
+    targetInstagramUsernameMasked: string | null;
     participantCount: number;
     /** `/me`에서만 쓴다 — 내가 만든 챌린지에 작은 표시를 붙인다. */
     isCreator?: boolean;
@@ -89,7 +111,10 @@ export function ChallengeRows({
               params={{ source: "list" }}
             >
               <span className="public-challenge-name">
-                {challenge.displayName}
+                <span className="public-challenge-name-text">{challenge.displayName}</span>
+                {challenge.targetInstagramUsernameMasked && (
+                  <span className="public-challenge-masked">{challenge.targetInstagramUsernameMasked}</span>
+                )}
                 {challenge.isCreator && <span className="challenge-mine-chip">내가 만든</span>}
               </span>
               <span

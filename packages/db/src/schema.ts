@@ -373,6 +373,17 @@ export const targetChallenges = pgTable("target_challenges", {
    * 않기 위해)로, 챌린지별 집계는 우리 DB에만 쌓는다.
    */
   shareCount: integer("share_count").notNull().default(0),
+  /**
+   * 2026-09-19 "masked Instagram username 공개 표시" 결정 — target을
+   * 확인용으로 보여주는 마스킹된 표시 문자열(예: `ple****os`)이다.
+   * `targetInstagramUsernameHash`(HMAC)는 복원 불가능하므로 여기서
+   * 계산할 수 없다 — 생성 시점에 정규화된 raw username으로부터
+   * `maskInstagramUsername()`이 별도로 계산해 저장하고, raw username
+   * 자체는 여전히 어디에도 저장하지 않는다(`AGENTS.md` §1 원칙 2 유지).
+   * 과거에 생성된 챌린지는 이 컬럼이 NULL로 남는다 — 해시로부터
+   * 소급 계산하지 않는다.
+   */
+  targetInstagramUsernameMasked: text("target_instagram_username_masked"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   tokenUnique: uniqueIndex("target_challenges_token_key").on(table.token),

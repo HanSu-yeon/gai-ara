@@ -1,5 +1,5 @@
 import JSZip from "jszip";
-import { extractUsernames } from "./normalize";
+import { extractUsernames } from "./normalize.ts";
 
 const FOLLOWERS_FILE_PATTERN = /followers(_\d+)?\.json$/i;
 const FOLLOWING_FILE_PATTERN = /following\.json$/i;

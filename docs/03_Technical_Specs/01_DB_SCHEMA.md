@@ -480,6 +480,7 @@ CREATE TABLE target_challenges (
   creator_participant_id uuid NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
   is_public boolean NOT NULL DEFAULT false,      -- 2026-09-15 신규, 홈 공개 목록
   share_count integer NOT NULL DEFAULT 0,        -- 2026-09-15 신규, 운영자 전용 지표
+  target_instagram_username_masked text,         -- 2026-09-19 신규, 마스킹 표시용(아래 참고)
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX target_challenges_token_key ON target_challenges (token);
@@ -534,6 +535,18 @@ CREATE UNIQUE INDEX target_challenges_target_hash_key ON target_challenges (targ
   안에서만 쌓는다. 로그인 여부와 무관하게 증가한다 — `/t/{token}`은
   비로그인 방문자도 열 수 있는 공개 화면이라 공유도 로그인 없이
   일어날 수 있다.
+- `target_instagram_username_masked`: **2026-09-19 "masked Instagram
+  username 공개 표시" 결정으로 추가**(nullable, unique 제약 없음,
+  `0016_youthful_microchip.sql`). `target_instagram_username_hash`(HMAC)는
+  복원 불가능하므로, 챌린지 생성 시점에 정규화된 raw username으로부터
+  `maskInstagramUsername()`(`apps/web/lib/instagram-identity.ts`)이 별도로
+  계산한 표시용 문자열(예: `@ple****os`)만 저장한다. raw username 자체는
+  이 컬럼을 포함해 어떤 테이블에도 저장하지 않는다(원칙 유지, §1 원칙 2).
+  `GET /api/challenges/{token}` 응답에 그대로 노출해 `/t/{token}` 참여자가
+  "내가 생각하는 그 대상이 맞는지" 확인하는 용도로만 쓰며, identity
+  matching·검색·lookup에는 쓰지 않는다. 과거에 생성된 챌린지는 이 값이
+  NULL로 남고, 해시로부터 소급 계산하지 않는다 — `/t/{token}` 화면은 NULL
+  이면 이 영역 자체를 렌더링하지 않는다.
 
 ### 4.10 `follows`에 필요한 인덱스 — 2026-09-14 (적용됨)
 

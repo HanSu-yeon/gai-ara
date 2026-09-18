@@ -397,6 +397,10 @@ type CreateChallengeResponse =
 // 절대 포함하지 않는다(§8.4 참고).
 type ChallengePublicInfo = {
   displayName: string;
+  // 2026-09-19 추가 — 마스킹된 표시용 문자열(예: "@ple****os")만 노출한다.
+  // raw username과 target_instagram_username_hash는 이 응답을 포함해
+  // 어떤 API 응답에도 절대 포함하지 않는다. 과거 생성된 챌린지는 null.
+  targetInstagramUsernameMasked: string | null;
   status: "searching" | "found";
   distance: number | null; // graph edge 수. searching이면 항상 null.
   lastConnectorCount: number; // 실제 distinct 마지막 연결자 수. 공개 동의 여부와 무관.

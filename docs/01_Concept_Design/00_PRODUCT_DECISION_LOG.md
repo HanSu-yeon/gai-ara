@@ -3,6 +3,80 @@
 제품 가설과 변경 이유, 검증 지표, 재검토 조건을 기록한다. 구현 상태만 설명하는 문서가
 아니며, 새 데이터가 쌓이면 기존 결정을 수정하거나 뒤집을 수 있다.
 
+## 2026-09-19 — 타겟 챌린지: masked Instagram username 공개 표시 (구현 완료)
+
+### 상태
+
+채택, 구현 완료.
+
+### 문제
+
+챌린지 생성자 본인도 "내가 등록해도 진짜 그 사람이 맞는지 헷갈린다"는
+문제가 있었고, 이어서 챌린지 참여자도 `/t/{token}`에서 "내가 생각하는 그
+사람을 대상으로 한 챌린지가 맞는지" 확인할 수 있어야 한다는 요구로 범위가
+확장됐다. `displayName`만으로는 검증된 인물명이 아니라서(오타·별명 허용,
+§4.9) 대상을 확신하기 어렵다.
+
+### 결정
+
+1. **raw Instagram username 미저장 원칙(`AGENTS.md` §1 원칙 2)은 그대로
+   유지한다.** 대신 마스킹된 표시용 값만 별도 컬럼
+   (`target_challenges.target_instagram_username_masked`, nullable, unique
+   제약 없음)에 저장한다. `target_instagram_username_hash`(HMAC)는
+   복원 불가능하므로 이 값을 해시로부터 계산할 수 없다 — 반드시 생성
+   시점에 정규화된 raw username으로부터 별도 계산해 저장해야 한다.
+2. **마스킹 규칙**(`maskInstagramUsername`,
+   `apps/web/lib/instagram-identity.ts`): 정규화된(trim·`@`제거·소문자화)
+   username 길이에 따라 노출 글자 수만 다르고, 가운데는 실제 길이와
+   무관하게 항상 고정 4글자 `****`를 쓴다 — 원본 길이를 유추할 수 없게
+   한다. 길이 1~3은 첫 1글자, 4~6은 첫 2글자, 7~9는 첫 2글자+끝 1글자,
+   10 이상은 첫 3글자+끝 2글자를 노출한다(예: `pledis_boos` →
+   `ple****os`). `@` 접두사를 붙인다.
+3. **`GET /api/challenges/{token}` 공개 응답에만 masked 값을 노출한다.**
+   `POST /api/challenges` 중복 생성 응답, `POST /api/challenges/{token}/join`
+   응답(`challengeProgressSchema` 공유)에는 추가하지 않는다 — join
+   엔드포인트에 username 관련 필드가 새어나가지 않아야 한다.
+4. **identity matching·검색·lookup에는 절대 쓰지 않는다.** masked 값은
+   UI 표시 전용이며, 이 값 기반의 챌린지 검색·필터·자동완성 기능은
+   만들지 않는다 — username 검색·lookup API 금지 원칙(`AGENTS.md` §1
+   원칙 3)은 그대로 유지된다.
+5. `/t/{token}`의 "찾았다"·"찾는 중" 두 분기 모두 `displayName` 바로
+   아래 masked username을 작은 회색 텍스트로 단독 표시한다("Instagram ·"
+   같은 설명 접두어 없이). 과거에 생성돼 이 값이 NULL인 챌린지는 이
+   영역 자체를 렌더링하지 않는다.
+
+### 유지하는 원칙
+
+- raw Instagram username은 어떤 테이블에도 저장하지 않는다.
+- masked 값으로부터 원본 길이·정확한 문자를 유추할 수 없어야 한다
+  (고정 개수 마스크).
+- masked 값은 표시 전용이며 검색·lookup·매칭에 쓰지 않는다.
+- join 응답 등 username과 무관한 엔드포인트에는 이 필드를 섞지 않는다.
+
+### 재검토 조건
+
+- masked 값만으로도 대상을 오인하는 사례가 반복되면 노출 규칙(글자 수)을
+  조정한다 — 새 컬럼이나 원본 저장 방식으로 바꾸지 않는다.
+
+### 관련 문서
+
+- [01_DB_SCHEMA.md §4.9](../03_Technical_Specs/01_DB_SCHEMA.md) —
+  `target_challenges.target_instagram_username_masked`.
+- [02_API_SPECS.md §8.2](../03_Technical_Specs/02_API_SPECS.md) —
+  `GET /api/challenges/{token}` 응답 확장.
+
+### 관련 구현
+
+- `packages/db/src/schema.ts`의 `targetChallenges.targetInstagramUsernameMasked`,
+  `packages/db/migrations/0016_youthful_microchip.sql`
+- `apps/web/lib/instagram-identity.ts`의 `maskInstagramUsername`
+  (`apps/web/lib/instagram-identity.test.ts`)
+- `apps/web/app/api/challenges/route.ts`(생성 시 계산·저장),
+  `apps/web/lib/challenges.ts`의 `createChallenge`/`getChallengeByToken`
+- `packages/shared/src/schemas.ts`의 `challengePublicInfoSchema`
+- `apps/web/app/api/challenges/[token]/route.ts`(공개 응답에 포함)
+- `apps/web/components/TargetChallengeScreen.tsx`(`TargetMaskedUsername`)
+
 ## 2026-09-16 — 로그인 제공자에 Google 추가 (카카오 단일 제공자 결정의 재검토 조건 충족)
 
 ### 상태

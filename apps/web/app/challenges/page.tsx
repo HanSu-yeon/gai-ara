@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BrandHeader } from "@/components/Brand";
-import { PublicChallengeList } from "@/components/PublicChallengeList";
+import { PublicChallengeList, CHALLENGE_LIST_PAGE_SIZE } from "@/components/PublicChallengeList";
 import { isBackendConfigured } from "@/lib/env";
 
 export const metadata = {
@@ -29,8 +29,27 @@ export const dynamic = "force-dynamic";
  *
  * 로그인은 필요 없다 — `/t/{token}` 자체가 로그인 전에도 열리는 공개
  * 공유 화면이고, 이 목록이 내보내는 값도 그 화면과 같은 범위다.
+ *
+ * 2026-09-19 추가 — "더보기"는 클라이언트 API 호출이 아니라 `?limit=N`
+ * 쿼리로 이 서버 컴포넌트를 다시 렌더링하는 방식이다(무한스크롤·별도 목록
+ * API 없이 `AGENTS.md` §1 원칙 3을 지키면서 점진적으로 더 보여준다).
+ * `limit`은 페이지 크기의 배수로만 늘어나도록 클램프한다 — 임의로 큰 값을
+ * 넣어 전체를 한 번에 긁어가는 걸 막기 위해서다.
  */
-export default function PublicChallengesPage() {
+const MAX_CHALLENGE_LIST_LIMIT = CHALLENGE_LIST_PAGE_SIZE * 10;
+
+function parseLimit(raw: string | string[] | undefined): number {
+  const value = Number(Array.isArray(raw) ? raw[0] : raw);
+  if (!Number.isFinite(value) || value <= 0) return CHALLENGE_LIST_PAGE_SIZE;
+  return Math.min(Math.ceil(value / CHALLENGE_LIST_PAGE_SIZE) * CHALLENGE_LIST_PAGE_SIZE, MAX_CHALLENGE_LIST_LIMIT);
+}
+
+export default async function PublicChallengesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ limit?: string | string[] }>;
+}) {
+  const limit = parseLimit((await searchParams).limit);
   return (
     <main className="brand-page challenges-page">
       <BrandHeader back />
@@ -42,7 +61,7 @@ export default function PublicChallengesPage() {
       <p className="subtitle">아는 사이가 모여 건너건너 이어져요.</p>
       {isBackendConfigured() ? (
         <div className="challenges-page-list">
-          <PublicChallengeList />
+          <PublicChallengeList limit={limit} />
         </div>
       ) : null}
       <Link href="/login?returnTo=/create" className="text-link text-xs mt-4">

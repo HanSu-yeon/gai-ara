@@ -159,6 +159,7 @@ export default function TargetChallengeScreen() {
           <br />
           {headline.top} {headline.bottom === "아는 사이" ? "이어지는 길을 발견했어요" : headline.bottom}
         </p>
+        <TargetMaskedUsername masked={info.targetInstagramUsernameMasked} />
         <ChallengePathStrip
           targetDisplayName={info.displayName}
           distance={info.distance}
@@ -170,6 +171,7 @@ export default function TargetChallengeScreen() {
           {sharing ? "공유하는 중…" : "챌린지 공유하기"}
         </button>
         <Link href="/create" className="text-link text-xs mt-4">다른 사람으로 만들어보기 →</Link>
+        <RequestPublicListing viewerIsCreator={info.viewerIsCreator} token={token} displayName={info.displayName} />
       </main>
     );
   }
@@ -192,6 +194,7 @@ export default function TargetChallengeScreen() {
         <br />
         닿을 수 있을까?
       </h1>
+      <TargetMaskedUsername masked={info.targetInstagramUsernameMasked} />
       <p className="subtitle">
         아직 가는 길을 찾고 있어요.
       </p>
@@ -259,7 +262,53 @@ export default function TargetChallengeScreen() {
           </button>
         </>
       )}
+      <RequestPublicListing viewerIsCreator={info.viewerIsCreator} token={token} displayName={info.displayName} />
     </main>
+  );
+}
+
+/**
+ * 2026-09-19 "masked Instagram username 공개 표시" 결정 — displayName만으로는
+ * 참여자가 "내가 생각하는 그 사람이 맞는지" 확신하기 어려운 문제를 풀기
+ * 위해, 마스킹된 표시값(`@ple****os`)을 단독으로만 보여준다. "Instagram ·"
+ * 같은 설명 접두어는 붙이지 않는다 — 목적이 설명이 아니라 대상 확인이기
+ * 때문이다(사용자 지정). masked 값이 null이면(과거에 만들어진 챌린지)
+ * 이 영역 자체를 렌더링하지 않는다 — 빈 자리를 두지 않는다.
+ */
+function TargetMaskedUsername({ masked }: { masked: string | null }) {
+  if (!masked) return null;
+  return <p className="target-masked-username">{masked}</p>;
+}
+
+const PUBLIC_LISTING_CONTACT_EMAIL = "hansuyeon.dev@gmail.com";
+
+/**
+ * 2026-09-19 "홈 공개 챌린지 목록은 항상 켜지 않는다" 결정 — `is_public`
+ * 기본값은 여전히 false이고, 사용자용 공개 설정 UI를 만들지 않는다
+ * (`AGENTS.md` §1 원칙 3). 대신 만든 사람이 공개를 원하면 운영자에게
+ * 메일로 문의해 직접 검토받도록 안내한다(`docs/01_Concept_Design/00_PRODUCT_DECISION_LOG.md`
+ * 2026-09-19 항목). 만든 사람에게만 보인다 — 다른 참여자가 남의 챌린지
+ * 공개를 대신 요청할 수 있는 통로를 만들지 않기 위해서다.
+ */
+function RequestPublicListing({
+  viewerIsCreator,
+  token,
+  displayName,
+}: {
+  viewerIsCreator: boolean;
+  token: string;
+  displayName: string;
+}) {
+  if (!viewerIsCreator) return null;
+  const mailto = `mailto:${PUBLIC_LISTING_CONTACT_EMAIL}?subject=${encodeURIComponent(
+    "[가이 알아?] 챌린지 공개 요청",
+  )}&body=${encodeURIComponent(
+    `이 챌린지를 공개 목록(/challenges)에 올리고 싶어요.\n\n- 대상 이름: ${displayName}\n- 챌린지 링크: /t/${token}\n`,
+  )}`;
+  return (
+    <a href={mailto} className="text-link text-xs mt-4">
+      이 챌린지를 공개 목록에 올리고 싶다면 문의하기 →
+    </a>
   );
 }
 

@@ -20,3 +20,33 @@ export function hashInstagramUsername(rawUsername: string): string {
   }
   return createHmac("sha256", pepper).update(normalizeUsername(rawUsername)).digest("hex");
 }
+
+const MASK = "****";
+
+/**
+ * 2026-09-19 — 표시 전용 마스킹: 길이별 prefix/suffix 글자 수만 다르고
+ * 가운데는 항상 고정 4글자 `****`(실제 길이 무관, 유추 방지)다. 이미
+ * `normalizeUsername`으로 정규화된 값을 받는다고 가정한다.
+ */
+export function maskInstagramUsername(normalizedUsername: string): string {
+  const length = normalizedUsername.length;
+  let prefixLength: number;
+  let suffixLength: number;
+  if (length <= 3) {
+    prefixLength = 1;
+    suffixLength = 0;
+  } else if (length <= 6) {
+    prefixLength = 2;
+    suffixLength = 0;
+  } else if (length <= 9) {
+    prefixLength = 2;
+    suffixLength = 1;
+  } else {
+    prefixLength = 3;
+    suffixLength = 2;
+  }
+
+  const prefix = normalizedUsername.slice(0, prefixLength);
+  const suffix = suffixLength > 0 ? normalizedUsername.slice(-suffixLength) : "";
+  return `@${prefix}${MASK}${suffix}`;
+}

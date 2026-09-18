@@ -10,6 +10,7 @@ export interface ChallengeDetail {
   id: string;
   displayName: string;
   targetInstagramUsernameHash: string;
+  targetInstagramUsernameMasked: string | null;
   creatorParticipantId: string;
 }
 
@@ -35,11 +36,17 @@ export type CreateChallengeResult =
  * 생성 시점 값을 그대로 유지한다 — 중복 판정 자체가 displayName이 아니라
  * targetInstagramUsernameHash(정규화된 username) 기준이기 때문에, 오타나
  * 별명 차이("부승관" vs "승관")가 서로 다른 챌린지를 만들지 않는다.
+ *
+ * 2026-09-19 추가 — `targetInstagramUsernameMasked`(표시 전용,
+ * `maskInstagramUsername()` 결과)도 함께 저장한다. 중복 감지 경로
+ * (`getChallengeByTargetHash`)는 이 값을 다루지 않는다 — 중복 응답에는
+ * masked 값을 추가하지 않는다(스펙 밖 범위).
  */
 export async function createChallenge(
   creatorParticipantId: string,
   displayName: string,
   targetInstagramUsernameHash: string,
+  targetInstagramUsernameMasked: string,
 ): Promise<CreateChallengeResult> {
   const db = getDb();
   const token = randomBytes(16).toString("hex");
@@ -48,7 +55,7 @@ export async function createChallenge(
     return await db.transaction(async (tx) => {
       const [row] = await tx
         .insert(targetChallenges)
-        .values({ creatorParticipantId, displayName, targetInstagramUsernameHash, token })
+        .values({ creatorParticipantId, displayName, targetInstagramUsernameHash, targetInstagramUsernameMasked, token })
         .returning({ id: targetChallenges.id, token: targetChallenges.token });
       if (!row) throw new Error("challenge insert returned no row");
 
@@ -158,6 +165,13 @@ export interface PublicChallengeSummary {
   token: string;
   displayName: string;
   targetInstagramUsernameHash: string;
+  /**
+   * 2026-09-19 추가 — `/challenges`·`/me` 목록에도 상세 화면(`/t/{token}`)과
+   * 같은 마스킹된 표시값을 보여준다(사용자 지정). raw username/해시는 여전히
+   * 이 요약에 노출하지 않는다 — `targetInstagramUsernameHash`는 서버에서
+   * 진행 상황 계산에만 쓰고 렌더링하지 않는다(기존 원칙 그대로).
+   */
+  targetInstagramUsernameMasked: string | null;
   participantCount: number;
 }
 
@@ -171,6 +185,7 @@ export async function listPublicChallenges(limit?: number): Promise<PublicChalle
       token: targetChallenges.token,
       displayName: targetChallenges.displayName,
       targetInstagramUsernameHash: targetChallenges.targetInstagramUsernameHash,
+      targetInstagramUsernameMasked: targetChallenges.targetInstagramUsernameMasked,
       participantCount,
     })
     .from(targetChallenges)
@@ -203,6 +218,7 @@ export async function listMyChallenges(participantId: string): Promise<MyChallen
     token: string;
     display_name: string;
     target_instagram_username_hash: string;
+    target_instagram_username_masked: string | null;
     participant_count: number;
     is_creator: boolean;
   }>(sql`
@@ -211,6 +227,7 @@ export async function listMyChallenges(participantId: string): Promise<MyChallen
       tc.token,
       tc.display_name,
       tc.target_instagram_username_hash,
+      tc.target_instagram_username_masked,
       (SELECT count(*) FROM challenge_participants x WHERE x.challenge_id = tc.id) AS participant_count,
       (tc.creator_participant_id = ${participantId}) AS is_creator
     FROM target_challenges tc
@@ -227,6 +244,7 @@ export async function listMyChallenges(participantId: string): Promise<MyChallen
     token: row.token,
     displayName: row.display_name,
     targetInstagramUsernameHash: row.target_instagram_username_hash,
+    targetInstagramUsernameMasked: row.target_instagram_username_masked,
     participantCount: Number(row.participant_count),
     isCreator: row.is_creator,
   }));
@@ -259,6 +277,7 @@ export async function getChallengeByToken(token: string): Promise<ChallengeDetai
       id: targetChallenges.id,
       displayName: targetChallenges.displayName,
       targetInstagramUsernameHash: targetChallenges.targetInstagramUsernameHash,
+      targetInstagramUsernameMasked: targetChallenges.targetInstagramUsernameMasked,
       creatorParticipantId: targetChallenges.creatorParticipantId,
     })
     .from(targetChallenges)

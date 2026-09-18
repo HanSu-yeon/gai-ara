@@ -1,9 +1,9 @@
-import { computeMutuals } from "./mutuals";
-import { extractFollowerData, InstagramExportParseError } from "./zip";
+import { computeMutuals } from "./mutuals.ts";
+import { extractFollowerData, InstagramExportParseError } from "./zip.ts";
 
-export { normalizeUsername, extractUsernames } from "./normalize";
-export { computeMutuals } from "./mutuals";
-export { extractFollowerData, InstagramExportParseError } from "./zip";
+export { normalizeUsername, extractUsernames } from "./normalize.ts";
+export { computeMutuals } from "./mutuals.ts";
+export { extractFollowerData, InstagramExportParseError } from "./zip.ts";
 
 /**
  * 브라우저에서 실행하는 최상위 진입점.
@@ -18,4 +18,4 @@ export async function parseMutualsFromZip(
   return computeMutuals(followers, following);
 }
 
-export { suggestUsernameFromFilename } from "./filename";
+export { suggestUsernameFromFilename } from "./filename.ts";

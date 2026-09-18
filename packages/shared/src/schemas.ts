@@ -235,6 +235,16 @@ export type ChallengePublicResult = z.infer<typeof challengePublicResultSchema>;
 export const challengePublicInfoSchema = z.object({
   displayName: z.string(),
   /**
+   * 2026-09-19 "masked Instagram username 공개 표시" 결정 — 참여자가
+   * "내가 생각하는 그 대상이 맞는지" 확인할 수 있도록 마스킹된 표시용
+   * 문자열(예: `@ple****os`)만 노출한다. raw username과 해시
+   * (`targetInstagramUsernameHash`)는 이 스키마를 포함해 어떤 응답에도
+   * 절대 포함하지 않는다. 과거에 생성된 챌린지는 null이다 —
+   * `challengeProgressSchema`/`joinChallengeResponseSchema`(join 엔드포인트가
+   * 공유하는 스키마)는 건드리지 않는다.
+   */
+  targetInstagramUsernameMasked: z.string().nullable(),
+  /**
    * 2026-09-15 추가 결정 — 챌린지 전체의 진행 상황과 **별개로**, 지금
    * 이 화면을 보는 본인이 target까지 몇 다리인지. 로그인한 뷰어에게만
    * 채워지고(비로그인이면 항상 null), 길이 없으면 null이다.
@@ -269,6 +279,13 @@ export const challengePublicInfoSchema = z.object({
    * 몇 명과 이어졌는지 같은 숫자는 담지 않는다 — 불리언 하나뿐이다.
    */
   viewerHasConnections: z.boolean(),
+  /**
+   * 2026-09-19 추가 — 이 뷰어가 챌린지를 만든 사람인지. 비로그인이거나
+   * 만든 사람이 아니면 false다. "공개 목록에 올리고 싶으면 문의해주세요"
+   * 안내를 만든 사람에게만 보여주기 위한 값일 뿐, 다른 뷰어에게 만든
+   * 사람의 신원(participantId 등)을 노출하지 않는다 — 불리언 하나뿐이다.
+   */
+  viewerIsCreator: z.boolean(),
 }).merge(challengePublicResultSchema);
 export type ChallengePublicInfo = z.infer<typeof challengePublicInfoSchema>;
 

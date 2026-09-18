@@ -1,4 +1,4 @@
-import { normalizeUsername } from "./normalize";
+import { normalizeUsername } from "./normalize.ts";
 
 /**
  * followers ∩ following = 맞팔(mutual follow) 목록.
