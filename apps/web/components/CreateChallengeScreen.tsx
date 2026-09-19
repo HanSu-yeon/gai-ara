@@ -138,6 +138,10 @@ export default function CreateChallengeScreen() {
         <br />
         함께 길을 찾아볼 수 있는 챌린지가 만들어져요.
       </p>
+      {/* 2026-09-19 결정 — 공개 여부는 운영자만 켜므로, 만들기 전에 기본값을 알려준다. */}
+      <p className="status-caption">
+        만든 챌린지는 기본적으로 공개 목록에 뜨지 않아요. 링크를 아는 사람만 열어볼 수 있어요.
+      </p>
       <form onSubmit={handleSubmit} className="upload-form">
         <div className="mt-6">
           <label htmlFor="challengeDisplayName" className="field-label">
